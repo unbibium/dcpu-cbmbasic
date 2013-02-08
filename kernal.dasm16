@@ -2336,9 +2336,6 @@ JMP [ROMFFFC]   ; RESET vector
 			JMP ROMB897
 :ROMB893	SET Y, 0
 			SET [FACOV], Y
-			; TODO: verify this against c64 better.
-			; it worked for printing 38911
-			; was: CMP #$F9, BMI $B862
 :ROMB897	IFU A, -7  ; Big exponent difference 
 				JMP ROMB862 
 				;which does this:
@@ -3474,8 +3471,6 @@ JMP [ROMFFFC]   ; RESET vector
 ; insert blank line in screen
 :ROME965
 			SET X, [TBLX] ; current line
-			; todo: verify on c64 that X doesn't start at zero
-			; when you type past the edge of line 5
 :ROME967	ADD X, 1
 			SET A, [LDTB1+X]
 			IFC A, DL_UNLINKED ; LONE LINE
@@ -4236,15 +4231,15 @@ JMP [ROMFFFC]   ; RESET vector
 :ROME6B6	JSR ROME8B3 ; move cursor to next line if 
                    ; at end of line -- X will equal old line number
 			ADD [PNTR], 1
-:ROME6BB	IFL [PNTR], [LNMX] ; Not at end of line
+:ROME6BB	SET A, [LNMX]
+                IFL A, [PNTR]
+                    JMP ROME6C1
 				RTS
-			; this branch is for when you type past the maximum logical line length
+:ROME6C1			; this branch is for when you type past the maximum logical line length
 			IFE [LNMX], (HW_COLS*ROWS_IN_LINE)-1
 				JMP ROME6F7
-				; TODO: verify on real c64 X <> zero 
 			IFN [AUTODN], 0  ; if scrolling enabled
-				JMP ROME965 ; insert blank line
-				; was ROME967
+				JMP ROME967 ; insert blank line
 :ROME6CD	SET X, [TBLX]
 			IFL X, HW_ROWS
 				JMP ROME6DA ; skip scrolling
