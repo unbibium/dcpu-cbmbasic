@@ -456,11 +456,15 @@ JMP [ROMFFFC]   ; RESET vector
 :DEBUGSPC
           DAT 0xA004, 0xA002, 0xA03A, 0xA020 ; "DB: "
 ; debug keyboard I/O
-          DAT 0xA00B, 0xA03A, "K:"
+          DAT 0xA00B, 0xA03A ; "K:"
 :DEBUGKEY
-          .FILL 11 0x0
+          .FILL 10 0x0
+; debug line link tbl
+		DAT 0xA00C, 0xA03A ; "L:" 
+:DEBUGLNK 
+		.FILL 14 0x0
 ; debug vblank interrupt
-          DAT 0xA009, 0xA03A, "I:"
+          DAT 0xA009, 0xA03A; "I:"
 :DEBUGINT
           .FILL 6 0x0
 
@@ -1577,7 +1581,7 @@ JMP [ROMFFFC]   ; RESET vector
 
 ; push FAC onto stack
 :ROMAE33
-			SET EX,0xCCC9
+			SET EX,0xAE33
 			JMP CRASH
 :ROMAD8D
 ; APPLY OPERATOR
@@ -1782,7 +1786,7 @@ JMP [ROMFFFC]   ; RESET vector
 			JSR CHRGOT
 			JSR ROMB113
 			
-			SET EX, 0xAAAA
+			SET EX, 0xB08B
 			JMP CRASH
 ; set C=1 if character in A is alphabetic
 ; might be slightly faster if we converted this
@@ -1799,7 +1803,7 @@ JMP [ROMFFFC]   ; RESET vector
 			JMP CRASH
 
 :NOTFNS ; Create a new BASIC variable
-:ROMB11D	SET EX, 0xAAAC
+:ROMB11D	SET EX, 0xB11D
 			JMP CRASH
 
 ; Compute pointer to array body
@@ -1891,7 +1895,7 @@ JMP [ROMFFFC]   ; RESET vector
 			
 ; expand FN call
 :ROMB3F4	;JSR ROMB3E1
-			SET EX, 0xEEE1
+			SET EX, 0xB3F4
 			JMP CRASH
 :STRD
 :ROMB465	JSR ROMAD8D
@@ -2270,7 +2274,7 @@ JMP [ROMFFFC]   ; RESET vector
 			JMP CHRGOT
 
 :ROMB7E2	
-			SET EX, 0xDDD1
+			SET EX, 0xB7E2
 			JMP CRASH
 ; *** floating point package **
 
@@ -3410,7 +3414,6 @@ JMP [ROMFFFC]   ; RESET vector
 			RTS
 
 ; check for color change codes
-; TODO
 :ROME8CB
 	SET X, 0x0f
 :ROME8CD	IFE A, [ROME8DA+X]
@@ -3471,17 +3474,20 @@ JMP [ROMFFFC]   ; RESET vector
 ; insert blank line in screen
 :ROME965
 			SET X, [TBLX] ; current line
+			; todo: verify on c64 that X doesn't start at zero
+			; when you type past the edge of line 5
 :ROME967	ADD X, 1
 			SET A, [LDTB1+X]
 			IFC A, DL_UNLINKED ; LONE LINE
 				JMP ROME967
-			SET [RAM02A5], X
+			SET [RAM02A5], X ; RAM02A5 is first unlinked line
+			                 ; below initial X value.
 			IFL X, HW_ROWS
 				JMP ROME981
 			SET X, [RAM02A5]
 			SUB X, 1
 			SUB [TBLX], 1
-			JMP ROME6DA
+			JMP ROME6DA ; Link line X with next line
 
 :ROME981	
 			SET X, HW_ROWS
@@ -3509,7 +3515,7 @@ JMP [ROMFFFC]   ; RESET vector
 			IFN X, 0
 			JMP ROME9AB
 :ROME9BF	SET X, [RAM02A5]
-			JSR ROME6DA
+			JSR ROME6DA ; link line X with next line
 			JMP ROME958 ; RTS
 
 ; move one screen line from [SCPNT] to [PNT]
@@ -3546,11 +3552,10 @@ JMP [ROMFFFC]   ; RESET vector
 ; clear one screen line
 :ROME9FF
 			JSR ROME9F0   ; set [PNT] line pointer to line X
-			; skip color ram handling
 			SET I, [PNT]
 			SET J, HW_COLS-1
 			ADD I, J
-			SET A, 0x0020 ; TODO: handle dynamic color
+			SET A, 0x0020 
 			BOR A, [COLOR]
 :ROMEA07	STD [I], A
 			IFN J, -1
@@ -3585,12 +3590,12 @@ JMP [ROMFFFC]   ; RESET vector
 ; normal IRQ interrupt
 :IRQ_HANDLER
 :ROMEA31    
-	SET [DEBUGINT+0], [RAMCD]
-	BOR [DEBUGINT+0], 0xC400
-	SET [DEBUGINT+1], [RAM028C]
-	BOR [DEBUGINT+1], 0xC000
-	SET [DEBUGINT+2], [RAM028B]
-	BOR [DEBUGINT+2], 0xC000
+	;SET [DEBUGINT+0], [RAMCD]
+	;BOR [DEBUGINT+0], 0xC400
+	;SET [DEBUGINT+1], [RAM028C]
+	;BOR [DEBUGINT+1], 0xC000
+	;SET [DEBUGINT+2], [RAM028B]
+	;BOR [DEBUGINT+2], 0xC000
 			;JSR ROMFFEA ; do clock
 			IFN [CRSW], 0
 				JMP ROMEA61
@@ -3684,21 +3689,8 @@ JMP [ROMFFFC]   ; RESET vector
 	    JSR SCANCTRL
 	IFE [KEYSHIFT], 0x05 ; CBM (shift+ctrl)
 	    JSR SCANCBM
-        SET Y, [LNMX]
-        SET X, DEBUGKEY+9
-        SET PUSH, B
-:DBGLOOP
-	; display Y register in hex in debugging line
-        SET B, Y
-        AND B, 0x0F
-        ADD B, [HEXTHING+B]
-        SET [X], B
-        BOR [X], 0xF000
-        DIV Y, 0x10
-        SUB X, 1
-        IFG X, DEBUGKEY+5
-           JMP DBGLOOP
-        SET B, POP
+	    JSR DISPLAY_KEY_DEBUG
+	    JSR DISPLAY_LINK_TABLE
 :ROMEAE0
 	SET Y, [SFDX] ; key being pressed
         SET A, Y   ; [SFDX] contains the actual value, not scan code
@@ -3768,9 +3760,55 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMEB47
 	RTS
 
-RTS
+:DISPLAY_LINK_TABLE
+		SET PUSH, I
+		SET PUSH, J
+		SET I, LDTB1
+		SET J, DEBUGLNK-1
+:LINKLOOP
+		STI X, [I]
+		SET [J], 0x192E
+		IFC X, DL_UNLINKED
+			SET [J], 0x1921
+		IFL I, LDTB1+HW_ROWS+3
+		JMP LINKLOOP
+		SET J, POP
+		SET I, POP
+		RTS
 
-:ROMEAEO 
+:DISPLAY_KEY_DEBUG
+	    ; debugging code to display some registers every frame
+        SET Y, [TBLX]  ; 
+        SET X, DEBUGKEY+9
+        SET PUSH, B
+:DBGLOOP
+	; display Y register in hex in debugging line
+        SET B, Y
+        AND B, 0x0F
+        ADD B, [HEXTHING+B]
+        SET [X], B
+        BOR [X], 0xF000
+        DIV Y, 0x10
+        SUB X, 1
+        IFG X, DEBUGKEY+5
+           JMP DBGLOOP
+        ; another one
+        SUB X, 1
+        SET Y, [PNTR]
+:DBGLOOP2
+	; display Y register in hex in debugging line
+        SET B, Y
+        AND B, 0x0F
+        ADD B, [HEXTHING+B]
+        SET [X], B
+        BOR [X], 0xF000
+        DIV Y, 0x10
+        SUB X, 1
+        IFG X, DEBUGKEY+0
+           JMP DBGLOOP2
+        SET B, POP
+
+:ROMEAE0 
 ;Decode the Keystroke and Place its ASCII Value in the Keyboard Buffer
 
 
@@ -3915,7 +3953,38 @@ RTS
 				JMP ROME82D
 			IFN A, CBM_DELETE ; insert
 				JMP ROME829
-			; TODO: complete
+			; TODO: complete insert routine
+			SET Y, [RAMD5]
+			SET A, [RAMD1]
+			ADD A, Y   ; A contains end of space to be inserted
+			SET A, [A]
+:ROME7F6	AND A, 0xFF
+			IFN A, CBM_SPACE
+				JMP ROME7FE
+			IFN Y, [PNTR]
+				JMP ROME805 ; No need to insert a line
+:ROME7FE	IFE Y, (HW_ROWS*ROWS_IN_LINE)-1
+				JMP ROME6A8 ; do nothing; can't expand further
+:ROME802	JSR ROME965 ; Insert a line below the current line
+:ROME805	SET PUSH, I
+			SET PUSH, J
+			SET I, [LNMX]
+			STD J, I  ; decrement both (unless this causes an off-by-one)
+			ADD J, [RAMD1] ; A contains address
+			;JSR ROMEA24
+:ROME80A	STD [J+1], [J]
+			IFN I, [RAMD3]
+				JMP ROME80A
+			SET [J+1], [J] ; do one more
+			; fill in space
+			SET I, [COLOR]
+			AND I, 0xFF00
+			BOR I, 0x0020
+			SET [J], I ; TODO: Proper color
+			SET J, POP
+			SET I, POP
+			ADD [INSRT], 1
+			JMP ROME6A8
 :ROME829	IFE [INSRT], 0
 				JMP ROME832
 :ROME82D	BOR A, 0x40  ; shift character
@@ -3924,13 +3993,13 @@ RTS
 				JMP ROME84C
 		SET X, [TBLX]
 		IFE X, 0
-			JMP ROME6A8
+			JMP ROME6A8 ; Do nothing, return.
 		SUB [TBLX], 1
-		SET A, [RAMD3]
+		SET A, [PNTR]
 		SUB A, HW_COLS
 		IFU A, 0
 			JMP ROME847
-		SET A, [RAMD3]
+		SET [PNTR], A
 		IFA A, -1 ; BPL
 			JMP ROME6A8
 :ROME847	JSR ROME56C ; get address
@@ -4164,20 +4233,25 @@ RTS
 			RTS
 
 ;advance the cursor, Get/insert new line
-:ROME6B6	JSR ROME8B3 ; move cursor to next line if nc
+:ROME6B6	JSR ROME8B3 ; move cursor to next line if 
+                   ; at end of line -- X will equal old line number
 			ADD [PNTR], 1
 :ROME6BB	IFL [PNTR], [LNMX] ; Not at end of line
 				RTS
+			; this branch is for when you type past the maximum logical line length
 			IFE [LNMX], (HW_COLS*ROWS_IN_LINE)-1
-				JMP ROME6F7 
+				JMP ROME6F7
+				; TODO: verify on real c64 X <> zero 
 			IFN [AUTODN], 0  ; if scrolling enabled
-				JMP ROME967 ; insert blank line
+				JMP ROME965 ; insert blank line
+				; was ROME967
 :ROME6CD	SET X, [TBLX]
 			IFL X, HW_ROWS
-				JMP ROME6DA
-			JSR ROME8EA  ; scroll the screen
+				JMP ROME6DA ; skip scrolling
+			JSR ROME8EA  ; scroll the screen first
 			SUB [TBLX], 1
 			SET X, [TBLX]
+			; link current line (X) with next line
 :ROME6DA	AND [LDTB1+X], 0xFFFF-DL_UNLINKED
 			BOR [LDTB1+1+X], DL_UNLINKED
 :ROME6E6	ADD [LNMX], HW_COLS
@@ -4875,8 +4949,8 @@ RTS
     SET PUSH, C
     SET A, 1
     HWI [KEYBOARD]
-    SET [DEBUGKEY+4], C
-    BOR [DEBUGKEY+4], 0xA200
+    SET [DEBUGINT+4], C
+    BOR [DEBUGINT+4], 0xA200
     SET [KEYASCII], C
     SET A, 2 ; check key
     SET B, C
@@ -4884,14 +4958,14 @@ RTS
     SET A, 2 ; check key
     SET B, 0x90 ; SHIFT
     HWI [KEYBOARD]
-    SET [DEBUGKEY+2], C
-    BOR [DEBUGKEY+2], 0xA200
+    SET [DEBUGINT+2], C
+    BOR [DEBUGINT+2], 0xA200
     SET [KEYSHIFT], C ; 1 if shift; 0 if no shift
     SET A, 2 ; check key
     SET B, 0x91 ; CTRL
     HWI [KEYBOARD]
-    SET [DEBUGKEY+1], C
-    BOR [DEBUGKEY+1], 0xA200
+    SET [DEBUGINT+1], C
+    BOR [DEBUGINT+1], 0xA200
     IFE C, 1
         BOR [KEYSHIFT], 0x04
     SET C, POP
