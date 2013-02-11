@@ -2160,20 +2160,17 @@ JMP [ROMFFFC]   ; RESET vector
 ; push FAC onto stack (4 WORDS)
 ; save rounded value of left operand
 ; X is set to the first column of the operator table
-:ROMAE33
-            SET X, [TBL_OP+Y]
-            SET Y, [FACSGN]
+:ROMAE33    SET X, [TBL_OP+Y]
             SET I, POP
-            SET PUSH, Y
-            JSR ROMBC1B
+            SET PUSH, [FACSGN]
+            JSR ROUND
             SET PUSH, [FACHO+1]
             SET PUSH, [FACHO]
             SET PUSH, [FACEXP]
-            JMP I
+            JMP I    ; instead of RTS
 
 ; Pop ARG from stack (4 WORDS)
-:ROMAE58
-            SET Y, -1
+:ROMAE58    SET Y, -1
             SET A, POP
 :ROMAE5B    IFE A, 0 ; oh wait, there's no operator
                 JMP ROMAE80
