@@ -11,8 +11,9 @@ JMP [ROMFFFC]   ; RESET vector
 ; so that i can work with DTDB
 :BASIC_TEST_STRING
     ;DAT "?", 34, "HI", 13
-    ;dat "?3.44"
-    DAT 0
+    dat "IF2THEN?3"
+    dat 13
+    DAT 0,0
 
 .DEFINE HW_COLS 32
 .DEFINE ROWS_IN_LINE 2
@@ -22,6 +23,10 @@ JMP [ROMFFFC]   ; RESET vector
 ; when HW_ROWS >= 12.
 
 .DEFINE TXTPTR RAM7A
+
+; I used to use a FILL here but this made the hex dump too
+; large to paste into web forms.
+.DEFINE BASICMEMEND BASICMEM+38912
 
 ; keyboard constants
 .DEFINE BLINK_FRAMES 20
@@ -273,10 +278,9 @@ JMP [ROMFFFC]   ; RESET vector
 :RAM69   ; Exponent (only 8 bits used)
 :ARGEXP DAT 0
 :RAM6A   ; Mantissa (32-bit)
-:ARGHO DAT 0
-:RAM6C DAT 0
+:ARGHO  DAT 0, 0
 :ARGSGN
-:RAM6E DAT 0
+:RAM6E  DAT 0
 :ARISGN ; Result of signed comparison
 :RAM6F  DAT 0
 :FACOV  ;low order mantissa byte for rounding
@@ -525,11 +529,6 @@ JMP [ROMFFFC]   ; RESET vector
 
           .FILL HW_COLS-29 0xA02E
 
-
-:BASICMEM     
-              .FILL 38912 0
-:BASICMEMEND
-                DAT 0
 
 
 ; ************* BASIC ROM ************
@@ -1078,10 +1077,10 @@ JMP [ROMFFFC]   ; RESET vector
             IFE A, CBM_RETURN 
                 JMP ROMAACA ; mark end and return
             SET [RAM0200+X], A
-            ; copy line to top of screen for debugging
-            SET [SCREENMEM+X], A
-            AND [SCREENMEM+X], 0x003F
-            BOR [SCREENMEM+X], 0x5000
+            ;; copy line to top of screen for debugging
+            ;SET [SCREENMEM+X], A
+            ;AND [SCREENMEM+X], 0x003F
+            ;BOR [SCREENMEM+X], 0x5000
             ADD X, 1
             IFL X, HW_COLS*ROWS_IN_LINE
                 JMP ROMA562
@@ -1359,17 +1358,18 @@ JMP [ROMFFFC]   ; RESET vector
             JSR ROMA7ED   ; execute command in token
             JMP NEWSTT    ; move to next statement
 
-; execute command in A
+; execute command  at RAM7A.
+; its first character or token is in A
 :ROMA7ED    IFN Z, 0  ; If zero bit set
                 RTS
 :ROMA7EF    SUB A, 0x80
             IFU A, 0   
-                JMP STMT_LET ; LET command
+                JMP STMT_LET ; simple variable assignment
 :ROMA7F3    IFG A, 0x22 ; number of commands
                 JMP ROMA80E
             SET PUSH, [TOKEN_ROUTINES+A] ; get address of next command
             JMP CHRGET
-            ; will return to statement with next character in A, C, Z.
+            ; will return to STMT_* with next character in A, C, Z.
 :ROMA807    IFE A, CBM_COLON
                 JMP ROMA7E1
             JMP SNERR
@@ -1383,7 +1383,7 @@ JMP [ROMFFFC]   ; RESET vector
 
 ; LET command
 :STMT_LET
-:ROMA9A5    JSR PTRGET
+:ROMA9A5    JSR PTRGET ; get variable from name
             ; should return an address
             SET [RAM49], A
             SET A, 0x82 ; equals code
@@ -1640,7 +1640,8 @@ JMP [ROMFFFC]   ; RESET vector
                 JMP ROMA937
             SET A, BASIC_THEN_TOKEN
             JSR SYNCHR
-:ROMA937    SET A, [FACEXP] ; get result of FRMEVAL
+:ROMA937    SET C, 0
+			SET A, [FACEXP] ; get result of FRMEVAL
             IFN A, 0
                 JMP ROMA940
 
@@ -1650,9 +1651,9 @@ JMP [ROMFFFC]   ; RESET vector
 
 :STMT_THEN
 :ROMA940    JSR CHRGOT
-            IFN C, 0 ; BCS
+            IFN C, 0        ; THEN <command>
                 JMP ROMA7ED ; execute command
-            JMP STMT_GOTO
+            JMP STMT_GOTO ; THEN <line number>
 
 :STMT_ON
 :ROMA94B    JSR ROMB79E  ; Get result of expression after ON
@@ -1698,7 +1699,7 @@ JMP [ROMFFFC]   ; RESET vector
             JMP ROMABB5
 
 :STMT_CMD
-:ROMAA86    JSR ROMB79E ; todo: what does it return?
+:ROMAA86    JSR ROMB79E ; get byte
             IFE Z, 1  ; i think it ends in CHRGOT
                 JMP ROMAA90
             SET A, CBM_COLON
@@ -1718,15 +1719,15 @@ JMP [ROMFFFC]   ; RESET vector
         IFE SP, [PRINT_SP]
             RTS
         ; report stack difference somehow
-        SET [SCREENMEM], [PRINT_SP]
-        SET [SCREENMEM+1], SP
+        SET [SCREENMEM+64], [PRINT_SP]
+        SET [SCREENMEM+66], SP
+        ; recover
         SET SP, [PRINT_SP]
         RTS
 
 ; Print string and get next thing.
 :ROMAA9A    JSR ROMAB21
 :ROMAA9D    JSR CHRGOT
-
 :STMT_PRINT
 :ROMAAA0    IFE Z, 1  ; print by itself, or non-semicolon-terminated
                 JMP ROMAAD7 ; print CR
@@ -1748,7 +1749,6 @@ JMP [ROMFFFC]   ; RESET vector
             JSR STRLIT  ; prepare string in memory
             JSR ROMAB21 ; print string in [INDEX]
             JSR ROMAB3B ; print space ?
-            RTS ; REMOVE THIS after you get frmeval to do a simple integer print
             JMP ROMAA9D
             
 ; zero-terminate this string
@@ -1759,6 +1759,7 @@ JMP [ROMFFFC]   ; RESET vector
             IFN [CHANNL], 0
                 RTS
             SET Z, 1
+
 ; RETURN at end of line on PRINT
 :ROMAAD7 
             SET A, CBM_RETURN  
@@ -1766,8 +1767,9 @@ JMP [ROMFFFC]   ; RESET vector
             IFC [CHANNL], 0x80
                 JMP ROMAAE5
             SET A, 0x0A  ; newline
-                JSR ROMAB47
+            JSR ROMAB47
 :ROMAAE5    XOR A, 0xFF 
+            SET Z, 0
             RTS
 
 ; routine for printing TAB( and SPC(
@@ -1798,6 +1800,7 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMAB10    SUB X, 1
 :ROMAB11    IFN X, 0
                 JMP ROMAB19
+            ; handle semicolon
 :ROMAB13    JSR CHRGET
             JMP ROMAAA2
 :ROMAB19    JSR ROMAB3B ; what does this return?
@@ -1827,7 +1830,6 @@ JMP [ROMFFFC]   ; RESET vector
             ; sanity check
             ;IFG A, 0xFF
             ;   JMP CRASH
-            ;dat 0x4000
             ;SET PUSH, X
             ;SET PUSH, Y
             JSR ROMAB47 ; print 1 character
@@ -2047,15 +2049,22 @@ JMP [ROMFFFC]   ; RESET vector
             JMP ERROR
 :ROMAD35    DAT 0x5000 ; i should really finish the cruncher first
  
-; get next non-string value
+; get formula, enforce that it is a number.
 :FRMNUM
 :ROMAD8A    JSR FRMEVAL
-:ROMAD8D    SET C, 0
-            IFE C, 1 ; skip next
+; check value to be numeric
+:ROMAD8D    IFB [VALTYP], 0x8000
+                JMP ROMAD99
+            RTS
 ; check value to be string
-:ROMAD8F    SET C, 1
+:ROMAD8F    IFC [VALTYP], 0x8000
+                JMP ROMAD99
+            RTS
+; this one will need a lot of testing
 ; check value according to C flag
-:ROMAD90    IFB [VALTYP], 0x80
+:ROMAD90    SET EX, 0xAD90
+            JMP CRASH
+            IFB [VALTYP], 0x8000
                 JMP ROMAD97
             IFE C, 1
                 JMP ROMAD99
@@ -2066,8 +2075,9 @@ JMP [ROMFFFC]   ; RESET vector
             JMP ERROR
 
                     
-; evaluate formula
-; sets [VALTYP] etc
+; evaluate formula, store result in FAC
+; sets [VALTYP] to 0 if result is a floating point number
+;                 -1 if result is a string pointer
 :FRMEVAL
 :ROMAD9E    SUB [RAM7A], 1
             SET X, 0
@@ -2081,16 +2091,16 @@ JMP [ROMFFFC]   ; RESET vector
             JSR GETSTK
             JSR EVAL ; get a single floating point number
             SET [OPMASK], 0
+            ; 
 :ROMADB8    JSR CHRGOT
-:ROMADBB
+:ROMADBB    XOR B, 0xABAB
+            XOR B, 0xABAB
 ; check for comparison operators.  This is a loop so that
 ; the combinations <>, <=, and => work.
 :ROMADBC    SUB A, 0xB1 ; code for greater-than
-            SET C, 0
-            IFL A, 0
+            IFU A, 0
                 JMP ROMADD7
-            SET C, 1
-            IFG A, 2         ;CMP #3
+            IFA A, 2         ;CMP #3
                 JMP ROMADD7  ;BCS $ADD7
             SHL A, 1         ;CMP #$01
             IFL A, 1         ;ROL
@@ -2102,29 +2112,31 @@ JMP [ROMFFFC]   ; RESET vector
             JSR CHRGET
             JMP ROMADBB  ; check for more comparison operators
             ; done detecting comparison operators
-:ROMADD7    SET X, [OPMASK]
-            IFN X, 0  ; comparison operator exists
+:ROMADD7    IFN [OPMASK], 0  ; comparison operator exists
                 JMP ROMAE07
-            IFG C, 0 ; set from...?
+            IFC A, 0xf000 ; result from SUB above was positive
                 JMP ROMAE58
             ADD A, 7  ; - 0xB1 + 7 = -0xAA
-            IFL A, 0x100
+            IFU A, 0   ; still less than 0
                 JMP ROMAE58
-            ; ..
-            ADD A, [RAM0D]   ; RAM0D is -1 if string, 0 if numeric
+            IFE [VALTYP], 0
+                ADD A, 1
             IFC A, 0xFF  ; zero in 8-bit
                 JMP CAT
-:ROMADE8    ; originally ADC #$FF did something
-            IFC A, 0x100 ; Carry bit clear in original
+:ROMADE8    IFC A, 0x100 ; Carry bit clear in original
                 SUB A, 1
             SET [INDEX], A
             MUL A, 2  ; I think the 6502 version multiplied by 3
+            ; Y now contains an index into the operator table.
             SET Y, A
-            ; token was...
+            ; if we're on the right side of an operator,
+            ; this POPs the precedence of that operator,
+            ; so we know whether to keep going.
 :ROMADF0    SET A, POP
+            ; TODO: re-examine this interpretation
             IFL [TBL_OP+Y], A
-                JMP ROMAE5D
-            JSR ROMAD8D ; check for type mismatch
+                JMP ROMAE5D  ; pop stack into ARG and return
+            JSR ROMAD8D ; check that term is numeric
 :ROMADF9    SET PUSH, A
             ; the value of Y is important at this entry point
 :ROMADFA    JSR ROMAE20
@@ -2139,7 +2151,7 @@ JMP [ROMFFFC]   ; RESET vector
 ; handle comparison operators
 :ROMAE07    ASR [VALTYP], 1   ; LSR $0D
             SET C, EX        
-            SET A, X
+            SET A, [OPMASK]
             SHL A, 1
             BOR A, C
 :ROMAE08    SUB [RAM7A], 1
@@ -2174,9 +2186,10 @@ JMP [ROMFFFC]   ; RESET vector
             SET A, POP
 :ROMAE5B    IFE A, 0 ; oh wait, there's no operator
                 JMP ROMAE80
+        ; A might contain a precedence level
 :ROMAE5D    IFE A, 0x64   ; lowercase D?
                 JMP ROMAE64
-            JSR ROMAD8D ; check for type mismatch
+            JSR ROMAD8D ; check that term is numeric
 :ROMAE64    SET [RAM4B], Y
 :ROMAE66    SET A, POP
             SHR A, 1
@@ -2187,6 +2200,7 @@ JMP [ROMFFFC]   ; RESET vector
             SET A, POP
             SET [ARGSGN], A
             XOR A, [FACSGN]
+            ASR A, 15
             SET [ARISGN], A
 :ROMAE80    SET A, [FACEXP]
 :ROMAE82    RTS
@@ -2198,7 +2212,7 @@ JMP [ROMFFFC]   ; RESET vector
 :EVAL
 :ROMAE83    JMP [RAM030A]
 :DEF_EVAL
-:ROMAE86    SET [VALTYP], 0
+:ROMAE86    SET [VALTYP], 0   ; numeric
 :ROMAE8A    JSR CHRGET
             IFE C, 0 ; is a digit
                 JMP FIN  ; read number into float
@@ -2243,7 +2257,7 @@ JMP [ROMFFFC]   ; RESET vector
 ; get operand
 
 :ROMAEE3    IFE A, BASIC_FN_TOKEN ; FN
-                JMP ROMB3F4
+                JMP FNDOER
 :ROMAEEA    IFG A, 0xB3 ; Token for a function or operator 
                 JMP ROMAFA7
 :PARCHK
@@ -2264,7 +2278,8 @@ JMP [ROMFFFC]   ; RESET vector
 ; Next non-whitespace character should be A,
 ; otherwise it's a syntax error.
 :SYNCHR
-:ROMAEFF    IFE [RAM7A], A
+:ROMAEFF    SET Y, [RAM7A]
+            IFE [Y], A
                 JMP CHRGET
 :SNERR ; ?SYNTAX  ERROR
 :ROMAF08    SET X, 0x0B ; 
@@ -2330,9 +2345,33 @@ JMP [ROMFFFC]   ; RESET vector
             JMP MOVFM
 
 :ISFUN
-:ROMAFA7    SET EX, 0xAFA7
-            JMP CRASH
-            
+:ROMAFA7    SET PUSH, A ; originally *2
+            SET X, A
+            JSR CHRGET
+            IFL X, 0x8F
+                JMP ROMAFD1
+            ; handle twp-argument functions (LEFT$ etc)
+            JSR CHKOPN
+            JSR FRMEVAL
+            JSR CHKCOM
+            JSR ROMAD8F ; check value is string
+            SET X, POP
+            SET PUSH, [RAM64]
+            SET PUSH, X
+            JSR ROMB79E  ; get byte
+            SET Y, POP
+            SET A, X
+            SET PUSH, A
+            JMP ROMAFD6
+            ; handle single-argument functions
+:ROMAFD1    JSR ROMAEF1
+            SET Y, POP
+:ROMAFD6    ; todo: figure out equivalent expression
+            ; originally 9FEA+Y
+            ; then jump to it
+            SET EX, 0xAFD6
+            DAT 0x3000
+   
 ; get time in float accu
 :ROMAF84    JSR ROMFFDE
             ; STX $64
@@ -2353,7 +2392,7 @@ JMP [ROMFFFC]   ; RESET vector
             IFE C, 1
                 JMP ROMB09F
             JMP SNERR
-:ROMB09F    SET [RAM0D], 0
+:ROMB09F    SET [VALTYP], 0  ; numeric
             SET [RAM0E], 0
             JSR CHRGET
             IFE C, 0 ; is a digit
@@ -2374,7 +2413,7 @@ JMP [ROMFFFC]   ; RESET vector
             ; look for sigil at the end
             IFE A, 0x24 ; $ for string
                 JMP ROMB0C4
-            SET [RAM0D], 0xFF 
+            SET [VALTYP], -1  ; string
             JMP ROMB0D4
 :ROMB0C4    IFN A, 0x25 ; % for integer
                 JMP ROMB0DB
@@ -2485,7 +2524,7 @@ JMP [ROMFFFC]   ; RESET vector
         ; to a positive integer
 :ROMB1B2    JSR CHRGET
 :ROMB1B5    JSR FRMEVAL
-:ROMB1B8    JSR ROMAD8D  ; check for type mismatch
+:ROMB1B8    JSR ROMAD8D  ; check that term is numeric
             SET A, [FACSGN]
             IFG A, 0x7F
                 JMP FCERR
@@ -2555,9 +2594,10 @@ JMP [ROMFFFC]   ; RESET vector
             SET [RAM10], A
             JSR ROMB092
             SET [DEFPNT], A
-            JMP ROMAD8D ; check for type mismatch
+            JMP ROMAD8D ; check that term is numeric
             
 ; expand FN call
+:FNDOER
 :ROMB3F4    ;JSR ROMB3E1
             SET EX, 0xB3F4
             JMP CRASH
@@ -2942,13 +2982,14 @@ JMP [ROMFFFC]   ; RESET vector
             RTS
 
 ; get a POKE address
-:ROMB7EB    JSR FRMNUM
-            JSR ROMB7F7
+:ROMB7EB    JSR FRMNUM  ; get an int
+            JSR GETADR ; convert to integer
             JSR ROMAEFD ; check for comma
-            JMP ROMB79E
+            JMP ROMB79E ; get a byte value
 
 ; convert float to integer
 
+:GETADR
 :ROMB7F7    IFB [FACSGN], 0x80 ; negative number
             JMP FCERR
         IFG [FACEXP], 0x90 ; > 65535
@@ -2970,11 +3011,12 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMB850
             JSR CONUPK
 :FSUBT
-:ROMB853    SET A, [BITS]
+:ROMB853    SET A, [FACSGN]
             XOR A, -1
-            SET [BITS], A
+            SET [FACSGN], A
             XOR A, [ARGSGN]
-            SET [ARISGN], 1
+            ASR A, 15
+            SET [ARISGN], A
             SET A, [FACEXP]
             JMP FADDT
 
@@ -2990,9 +3032,9 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMB86A    ; A = FACEXP
             IFE A, 0  ; 0 + ARG = ARG
                 JMP MOVFA
-            SET [RAM56], [FACOV]
+            SET [RAM56], [FACOV]  ;ARGOV?
             SET X, ARGEXP ; ?
-            SET A, [X]    ; A = actual exponent
+            SET A, [ARGEXP]    ; A = actual exponent
 :ROMB877    SET Y, A
             IFE Y, 0 ; FAC + O = FAC
                 RTS
@@ -3002,8 +3044,9 @@ JMP [ROMFFFC]   ; RESET vector
             IFE EX, -1   ; subtraction underflow
                 JMP ROMB893
 :ROMB881    SET [FACEXP], Y ; Store larger exponent
-            SET Y, [ARGSGN]
-            SET [BITS], Y
+			; TODO: WHY DOES FIXING THIS BY CHANGING 
+			; BITS TO FACSGN CAUSE WEIRD PROBLEMS
+            SET [BITS], [ARGSGN] 
             XOR A, 0xFFFF ; 
             ADX A, 1   ; ADC #$00 after a subtract
 :ROMB88B    SET Y, 0
@@ -3123,7 +3166,6 @@ JMP [ROMFFFC]   ; RESET vector
             RTS
             
 :NEGFAC ; replace FAC1 with its 2s-complement
-; not sure if [FACSGN] is high or low bits?
 :ROMB947    XOR [FACSGN], 0xFFFF  
 :ROMB94D    XOR [FACHO], 0xFFFF
             XOR [FACHO+1], 0xFFFF
@@ -3234,8 +3276,7 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMBA28    JSR CONUPK
 ; times operator
 :FMULTT
-:ROMBA2B
-            IFE A, 0  
+:ROMBA2B	IFE A, 0  
                 RTS ; anything times 0 = 0
             SET [RESHO], 0
             SET [RESHO+1], 0
@@ -3275,17 +3316,16 @@ JMP [ROMFFFC]   ; RESET vector
 ; return FAC1's exponent in A to enable special
 ; zero-handling and a few shortcuts.
 :CONUPK
-:ROMBA8C    SET I, A
+:ROMBA8C    SET [INDEX], A
 :ROMBA8CI   SET [ARGEXP], [A]
             SET B, [A+1]
-            SET J, B
             SET [ARGSGN], B
-            ASR [ARGSGN], 15  ; trying to fix a bug
+            ASR [ARGSGN], 15  ; pure 0 or -1
             SET [ARGHO], B
             BOR [ARGHO], 0x8000 ; high bit is always 1
             XOR B, [FACSGN]
-            ASR B, 15
-:ROMBA8CJ   SET [ARISGN], B
+            ASR B, 15   ; pure 0 or -1
+            SET [ARISGN], B
             SET [ARGHO+1], [A+2]
             SET A, [FACEXP]
             RTS
@@ -3309,12 +3349,12 @@ JMP [ROMFFFC]   ; RESET vector
             SET [FACEXP], A
             IFN A, 0
                 JMP ROMB8FB ; set FACSGN too and RTS.
-            ; put comparison result into BITS
-:ROMBACF    SET [BITS], [ARISGN]
+            ; put comparison result into ARISGN
+:ROMBACF    SET [FACSGN], [ARISGN]
 :ROMBAD3    RTS
 
-:MULVEX
-:ROMBAD4    SET A, [BITS]
+:MLDVEX
+:ROMBAD4    SET A, [FACSGN]
             XOR A, -1
             IFB A, 0x8000
                 JMP OVERR
@@ -3536,7 +3576,7 @@ JMP [ROMFFFC]   ; RESET vector
         SET [FACEXP], X
         SET [FACHO+1], A
         SET [FACOV], A
-        SET [BITS], A
+        SET [FACSGN], A
         JMP ROMB8D2
             ;... does a NEGFAC if EX = -1,
             ; then normalizes the thing
@@ -3586,7 +3626,7 @@ JMP [ROMFFFC]   ; RESET vector
                 RTS ; give up on comparison?
 ; in 6502, C=1 meant memory was higher..
 ; in DCPU-16, EX=0 meant memory was higher.
-:ROMBC92    SET X, [BITS]
+:ROMBC92    SET X, [FACSGN]
             IFE EX, 0 ; no underflow in the subtract
                 XOR X, -1
             SET A, X  ; ROMBC31nex
@@ -3734,6 +3774,7 @@ JMP [ROMFFFC]   ; RESET vector
             JSR ROMBC3C
             SET A, [ARGSGN]
             XOR A, [FACSGN]
+            ASR A, 15
             SET [ARISGN], A
             SET A, [FACEXP]
             JMP FADDT
@@ -4017,13 +4058,13 @@ JMP [ROMFFFC]   ; RESET vector
             JMP ERROR
 
 ; CHROUT plus error checking for BASIC
-; (treats C as error flag, X as error number)
+; (treats EX as error flag, X as error number)
 :ROME10C    JSR CHROUT
-            IFG C, 0 ; carry bit set
+            IFN EX, 0 ; carry bit set
                 JMP ROME0F9
             RTS
 :ROME112    JSR CHRIN
-            IFG C, 0
+            IFG EX, 0
                 JMP ROME0F9
             RTS
 :ROME118    JSR ROME4AD
@@ -4297,7 +4338,7 @@ JMP [ROMFFFC]   ; RESET vector
     ;SET [DEBUGINT+2], [RAM028B]
     ;BOR [DEBUGINT+2], 0xC000
             ;JSR ROMFFEA ; do clock
-            IFN [CRSW], 0
+            IFN [BLNSW], 0
                 JMP ROMEA61
             ; FLASH CURSOR
             SUB [BLNCT], 1
@@ -4760,6 +4801,7 @@ RTS
             SET [BLNON], 0   
             SET [RAM028F], ROMEB48
             SET [BLNCT], 12
+            SET [BLNSW], 12
             ;SET [CRSW], 12
             SET [XMAS], 10
             SET [RAM028A], 10
@@ -4946,7 +4988,8 @@ RTS
             JSR ROME6B6 ; advance cursor
             
 ; return from output to the screen
-:ROME6A8    SET J, POP
+:ROME6A8    
+            SET J, POP
             SET I, POP
             SET Y, POP
             IFN [INSRT], 0
@@ -5309,47 +5352,48 @@ RTS
 :ROMF116    .DAT 13, "VERIFYIN", 0xC7
 
 ; close serial bus device
-:ROMF642  RTS
+;:ROMF642  RTS
 
 ; check for STOP key (probably ESC)
 :DEF_STOP
 :ROMF6ED  RTS
 
 ; increment real time clock
-:ROMF89B  RTS
+;:ROMF89B  RTS
+
+; Here are some subroutines that can probably be
+; replaced with a single DCPU-16 instruction
+; where appropriate.
 
 ; move save/load address into $AC/$AD
 
-:ROMFB8E    SET [SAL], [RAMC1]
-            RTS
+;:ROMFB8E    SET [SAL], [RAMC1]
+;            RTS
 
 ; compare $AC/$AD with $AE/$AF
 
-:ROMFCD1    SET C, 0
-            IFG [SAL], [EAL]
-               SET C, 1
-            RTS
+;:ROMFCD1    SET C, 0
+;            IFG [SAL], [EAL]
+;               SET C, 1
+;            RTS
             
 
 ; increment $AC/$AD
 
-:ROMFCDB    ADD [SAL], 1
-            RTS
+;:ROMFCDB    ADD [SAL], 1
+;            RTS
 
 ; RESET routine  (SYS 64738)
 
 :ROMFCE2       SET SP, STACKEND-1
-
                ; omitted cartridge code at FCE7 and FD02
-
-:ROMFCEF      ; ...
 ; initialize display, keyboard and clock
 :ROMFCF2      JSR IOINIT 
 :ROMFCF5      JSR RAMTAS 
-:ROMFCF8      JSR RESTOR 
-:ROMFCFB      JSR CINT   
-:ROMFCFE      IAQ 0 ;CLI
-:ROMCFCC      JMP [ROMA000]  ; START BASIC              
+              JSR RESTOR 
+              JSR CINT   
+              IAQ 0 ;CLI
+              JMP [ROMA000]  ; START BASIC              
 
 ; restore I/O vectors
 ; this isn't necessary because the I/O vectors are assembled in
@@ -5448,8 +5492,8 @@ RTS
 :MEMBOT
 :ROMFF9C
 :ROMFE34   IFN C, 0 ; write if carry bit set
-:ROMFE36       SET X, [MEMSTR]
-:ROMFE3C   SET [MEMSTR], X  
+           SET X, [MEMSTR]
+           SET [MEMSTR], X  
            RTS
 
 ; NMI entry stub
@@ -5716,3 +5760,6 @@ RTS
 
 ; jump here if assertion fails
 :CRASH DAT 0x3000
+
+:BASICMEM     
+        .FILL 10 0 
