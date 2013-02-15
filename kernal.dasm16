@@ -941,11 +941,13 @@ JMP [ROMFFFC]   ; RESET vector
 :BLTU
 ; Parameters in [RAM5F], [RAM5A], and [RAM58]
 ; RETURN: ?
-:ROMA3B8        ;JSR REASON
-                SET [STREND], A ; start of free RAM
+:ROMA3B8        JSR REASON      ; garbage collect?
+                SET [STREND], A ; returned start of free RAM
 :ROMA3BF        SET B, [RAM5F] ; source start address
                 SET J, [RAM5A] ; source end address
                 SET I, [RAM58] ; destimation end address
+                IFE J, B
+                    RTS
 :ROMA3BG        STD [I], [J]
                 IFN J, B
                     SET PC, ROMA3BG
@@ -1014,10 +1016,10 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMA480    JMP [IMAIN] ; normally ROMA483
 :DEF_MAIN
 :ROMA483    
-			; debugging is useful
-			IFE DEBUGPROGMEM, 0
-				JMP SKIPBMEM
-			SET I, SCREENMEM
+            ; debugging is useful
+            IFE DEBUGPROGMEM, 0
+                JMP SKIPBMEM
+            SET I, SCREENMEM
             SET J, BASICMEM
 :BMEMLOOP
             STI [I], [J]
@@ -1072,10 +1074,10 @@ JMP [ROMFFFC]   ; RESET vector
             ; Make room for new line by moving the rest
             ; of the program up
 :ROMA4F8    SET EX, 0xA4F8
-			; sanity check -- something's clearing VARTAB
-			IFE [VARTAB], 0
-				JMP VARTABCRASH
-			SET A, [VARTAB]
+            ; sanity check -- something's clearing VARTAB
+            IFE [VARTAB], 0
+                JMP VARTABCRASH
+            SET A, [VARTAB]
             SET [RAM5A], A  ; source end address
             ADD A, [COUNT]  ; add number of characters
             SET [RAM58], A  ; destination end address
@@ -1242,7 +1244,7 @@ JMP [ROMFFFC]   ; RESET vector
             RTS
 
 ; SEARCH for a line in a program
-; pass address of current line in A (originally A+X)
+; pass address of first line to check in A (originally A+X)
 ; returns C=1 and address in RAM5F if found
 ; returns C=0 if not found
 
@@ -1288,9 +1290,9 @@ JMP [ROMFFFC]   ; RESET vector
 
 :ROMA660    JSR CLALL
 :ROMA663    SET [FREETOP], [MEMSIZ]
-			;SET EX, 0xA663
-			;IFE [VARTAB], 0
-			;	JMP VARTABCRASH
+            ;SET EX, 0xA663
+            ;IFE [VARTAB], 0
+            ;   JMP VARTABCRASH
             SET [ARYTAB], [VARTAB]
             SET [STREND], [VARTAB]  ; set start of free RAM
 :ROMA677    JSR STMT_RESTORE
@@ -1462,12 +1464,12 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMA9A5    JSR PTRGET ; get variable from name
             ; should return an address
             SET [RAM49], A
-            SET A, 0x82 ; equals code
+            SET A, 0xB2 ; equals code
             JSR SYNCHR
             SET PUSH, [INTFLG]
             SET PUSH, [VALTYP]
             JSR FRMEVAL
-            SET A, POP
+            SET A, POP ; VALTYP of variable...
             MUL A, 2  ; ROL
             AND A, 0xFF
             JSR ROMAD90
@@ -1643,6 +1645,7 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMA8A0    JSR LINGET  ; get target line
             JSR ROMA909  ; Set I to the 0 at the end of this line
             SET A, I ; start at next line
+            ADD A, 1 ; skip over null 
             IFG [CURLIN], [LINNUM]
                 SET A, [TXTTAB] ; start at beginning
             JSR FINDLNA ; set [RAM5F] to address of target
@@ -1684,6 +1687,8 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMA8FB        SET [RAM7A], I
             RTS
 
+; todo: should the I point to the zero or the
+; character after the zero?
 ; GET END OF LINE
 ; returns address of next line in I, ready for RAM7A.
 ; (original returned number to add in Y)
@@ -2385,6 +2390,7 @@ JMP [ROMFFFC]   ; RESET vector
             
 ; Get value of variable
 :ROMAF28    JSR PTRGET  ; get pointer
+:ISVAR
 :ROMAF2B    SET [RAM64], A
             SET A, [VALTYP]
             IFE A, 0
@@ -2538,6 +2544,7 @@ JMP [ROMFFFC]   ; RESET vector
             RTS
 
 :NOTFNS ; Create a new BASIC variable
+; VARIABLE POINTERS ARE 5 WORDS INSTEAD OF 7 BYTES
 ; todo: figure out what was pushed on the stack
 :ROMB11D    SET A, PEEK
             IFN A, 0x2A ; Array?
@@ -2545,8 +2552,8 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMB123    SET A, 0x13 ; ?
             SET Y, 0xBF ; ?
             RTS
-:ROMB128    SET A, [RAM45]
-            SET Y, [RAM46]
+:ROMB128    SET A, [VARNAM]
+            SET Y, [VARNAM+1]
             IFN A, 0x54 ; T
                 JMP ROMB13B
             IFE Y, 0xC9 ; I$
@@ -2557,27 +2564,24 @@ JMP [ROMFFFC]   ; RESET vector
                 JMP ROMB143
             IFE A, 0x54 ; T
                 JMP ROMAF08
-:ROMB143    SET [RAM5F], [ARYTAB]
-            SET A, [STREND]
+:ROMB143    SET [RAM5F], [ARYTAB] ; start of source
+            SET A, [STREND] ; end of all variables
             SET [RAM5A], A  ; end of source
-            ADD A, 7
+            ADD A, 5
             SET [RAM58], A ; end of destination
             JSR BLTU
             SET A, [RAM58]
             ADD A, 0x100 ; yes, it seemed to add the high byte
             SET [ARYTAB], A
             SET Y, [RAM5F]
-            SET A, [RAM45]
             ; bytes 1&2: name
-            SET [Y], [RAM45]
-            SET [Y+1], [RAM46]
+            SET [Y], [VARNAM]
+            SET [Y+1], [VARNAM+1]
             ; bytes 3-7: ???
             ; 16-bit version probably uses 3
             SET [Y+2], 0
             SET [Y+3], 0
             SET [Y+4], 0
-            SET [Y+5], 0
-            SET [Y+6], 0
 :ROMB185    SET A, [RAM5F]
             ADD A, 2 ; skip past name, to contents
             SET [VARPNT], A
@@ -5682,8 +5686,8 @@ RTS
     STI [J], A
     IFL J, FONTXOR2+52
        SET PC, FONTLOOP2
-	IFE STARTLOWER, 1
-    	JSR TOGGLEFONT
+    IFE STARTLOWER, 1
+        JSR TOGGLEFONT
     RTS
 
 :TOGGLEFONT
@@ -5835,9 +5839,9 @@ RTS
     DAT 0x888, 0x8f8, 0x88f, 0xccc
 
 :VARTABCRASH
-	SET A, [VARTAB]
-	SET B, [STREND]
-	
+    SET A, [VARTAB]
+    SET B, [STREND]
+    
 ; jump here if assertion fails
 :CRASH DAT 0x3000
 
