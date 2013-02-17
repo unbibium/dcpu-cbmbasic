@@ -2757,9 +2757,8 @@ JMP [ROMFFFC]   ; RESET vector
             ; i think this bit here is set to treat
             ; stuff in the 200-2FF range different from
             ; stuff in the ROM range
-:ROMB4B7
-            IFL [RAM6F], 0x0100 ; What memory range we test?
-                JMP ROMB4BF
+:ROMB4B7	IFL [RAM6F], 0x0100 ; (the 6502 version had a BEQ on 
+                JMP ROMB4BF     ; the high byte here; I don't know why yet)
             IFG A, RAM0200+BASIC_BUFFER_LENGTH ; not immediate mode
                 JMP ROMB4CA  ; save on descriptor stack
             IFU A, RAM0200
