@@ -13,22 +13,13 @@ I then considered looking at old 8-bit ports of BASIC.  I know a
 fair bit of 6502 assembly, and have reverse engineered a couple of
 Atari 2600 games in college.  So I started looking online for online
 disassemblies of various BASICs.  As it turned out, no BASIC was
-obviously the simplest.  I thought that Woz's Integer BASIC would
-be a prime candidate, since I wouldn't have to muck around with
-floating point math.  But I wasn't as familiar with it as I was
-with the Atari 8-bit BASIC, or with Commodore 64 BASIC V2.  I also
-knew that there was a Unix port of CBM BASIC, so it was possible
-to decouple the BASIC interpreter from the KERNAL, or so I imagined.
-Besides, Atari BASIC was slow.  So, I looked up the CBM BASIC
-disassembly and got started.
+obviously the simplest, but CBM BASIC seemed to have the fewest
+pitfalls.
 
-I soon discovered that since the BASIC was included in the machine's
-ROM, it wasn't as decoupled from teh KERNAL as I'd hoped.  But then
-I decided that a BASIC interpreter, in and of itself, wasn't anything
-anyone would bother looking at for very long.  If I could port the
-entire KERNAL and BASIC, I could make a DCPU-16 machine that behaved
-as though it were another CBM-manufactured machine, like some kind
-of 16-bit Plus-4.
+As I progressed, I realized that if I could port the entire KERNAL
+and BASIC, I could make a DCPU-16 machine that behaved as though
+it were another CBM-manufactured machine, like some kind of 16-bit
+Plus-4.
 
 As much fun as it would be to pretend that a CBM-style kernal was
 available in the 0x10c universe, there are a few things about the
@@ -37,17 +28,36 @@ canonical product of an in-game corporation.  Everything about the
 DCPU-16 and LEM-1802 design suggests an ASCII-based memory and
 keyboard, while CBM machines use PETSCII to represent strings
 internally, and a differently-ordered PETSCII to represent text
-visible on the screen.  
+visible on the screen.  I've made this work with a custom font,
+but it means that this won't work with any text-mode emulators,
+if they exist.  
 
-Currently, this program will display the startup message, set up
-BASIC memory, and allow keyboard input.  Behind the scenes, I have
-much of the floating point math package working, since it turned
-out to be necessary to print the "38911 BASIC BYTES FREE" message.
-It's also using the C64 font's character layout, and the C64 palette.
-There's a lot of untested BASIC code floating around in there too.
+A substantial fraction of the features work, but it's not useful
+yet.  Here's a mostly-complete list of things that will work
+mostly like they do on the C64:
 
-It does not actually execute any BASIC commands, and there are
-some bugs that make the screen editor not quite useful anyway.
+* Screen editing
+* Program entry
+* Immediate mode
+* BASIC commands: GOTO, PRINT, RUN, CLR, END, STOP, REM, IF
+* BASIC keyword abbreviations with shifted second letters
+* The ? abbreviation for PRINT
+* Expressions involving integers, addition, and subtraction:
+    PRINT 3+4
+    PRINT 5-9
+* String literals
+* Allocating and printing string variables like A$
+* Allocating and using float variables like A
+
+Just about anything else won't work, and may even crash the machine.
+
+This program was developed using the DCPU toolchain at
+http://dcputoolcha.in/ -- mostly the command-line tools,
+since the DT IDE crashes on my PC and won't compile on my Mac.
+I've noticed it has trouble running on other implementations,
+but I haven't had time to investigate why yet.
+
+DISCLAIMER:
 
 If your spaceship has this kernal, you will have a bad problem and
 you will not go to space today.  There's a good chance this project
