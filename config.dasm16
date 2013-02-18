@@ -1,0 +1,57 @@
+; DCPU-16 CBM BASIC
+; configuration
+;
+; I've mostly separated this out so I don't have to commit all
+; my debugging whims to github, so just about everything I use
+; to debug this program will be moved here over time.
+;
+; 0 = start in uppercase
+; 1 = start in lowercase
+.DEFINE STARTLOWER 0
+
+; 1 = copy BASIC memory to top line of screen.
+.DEFINE DEBUGPROGMEM 0
+
+; set this to 11 to get a peek at whatever blocks of
+; memory I was trying to examine last time I worked on this
+.DEFINE HW_ROWS 12
+
+; determines the amount of memory to set aside
+; for parsing typed lines of BASIC.
+; when I'm feeling more adventurous I might increase the
+; rows_in_line to 3 or 4.
+.DEFINE BASIC_BUFFER_LENGTH 144
+.DEFINE ROWS_IN_LINE 2
+
+.DEFINE BLINK_FRAMES 20
+.DEFINE REPEAT_FRAMES_A 16 
+.DEFINE REPEAT_FRAMES_B 4 
+
+.DEFINE KEYBOARD_BUFFER_SIZE 80
+
+; you can define an automatic test program here
+; as long as it's smaller than the keyboard buffer above
+; terminate in 0.
+:BASIC_TEST_STRING
+	DAT 0
+    DAT "10 G", 79+128, "30"
+    dat 13
+    dat "30 ?3"
+    dat 13
+    dat "20 ?2"
+    dat 13
+    dat "RUN"
+    dat 13
+    DAT 0,0
+
+:RUN_TEST_STRING
+    SET I, BASIC_TEST_STRING
+    SET J, KEYD
+:TEST_STRING_LOOP
+    STI [J], [I]
+    IFN [J-1], 0
+        JMP TEST_STRING_LOOP
+    SUB J, KEYD
+    SET [NDX], J
+    RTS
+

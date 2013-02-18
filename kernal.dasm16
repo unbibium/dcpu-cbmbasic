@@ -11,32 +11,10 @@
 
 JMP [ROMFFFC]   ; RESET vector
 
-; 0 = start in uppercase
-; 1 = start in lowercase
-.DEFINE STARTLOWER 1
-
-; 1 = copy BASIC memory to top line of screen.
-.DEFINE DEBUGPROGMEM 1
-
-; so that i can work with DTDB
-:BASIC_TEST_STRING
-    dat 0, "A=999929", 13
-	dat "1 PRINT", 13, 0
-    dat "A$=", 34, "HI!", 34, 13
-    DAT "?", 34, "HI", 34, 13, 0
-    DAT "10 GOTO 30"
-    dat 13
-    dat "30 ?3"
-    dat 13
-    dat "20 ?2"
-    dat 13
-    dat "RUN"
-    dat 13
-    DAT 0,0
+; mostly testing stuff is here.
+.INCLUDE "config.dasm16"
 
 .DEFINE HW_COLS 32
-.DEFINE ROWS_IN_LINE 2
-.DEFINE HW_ROWS 11
 
 ; todo: use a bunch of IFDEFs to hide all the debugging code
 ; when HW_ROWS >= 12.
@@ -48,12 +26,6 @@ JMP [ROMFFFC]   ; RESET vector
 .DEFINE BASICMEMEND BASICMEM+38912
 
 ; keyboard constants
-.DEFINE BLINK_FRAMES 20
-.DEFINE REPEAT_FRAMES_A 16 
-.DEFINE REPEAT_FRAMES_B 4 
-
-.DEFINE KEYBOARD_BUFFER_SIZE 80
-
 .DEFINE DCPU_BACKSPACE 0x10
 .DEFINE DCPU_RETURN 0x11
 .DEFINE DCPU_INSERT 0x12
@@ -80,85 +52,9 @@ JMP [ROMFFFC]   ; RESET vector
 .DEFINE CBM_COLON 0x3A
 
 
-;:ROMA000    DAT TESTPRGINIT
 :ROMA000    DAT ROME394     ; Vector for starting BASIC
 :ROMA002    DAT ROME37B
 
-; small test program that can be run instead of BASIC
-; to test specific things.  Also useful for catching
-; routines that don't establish pointers properly and
-; start destroying low memory.
-:TESTPRGINIT ;IAQ 1
-            SET A, CBM_CLR 
-            JSR CHROUT
-:TESTPRG    SET A, 38911
-            JSR LINPRT
-            SET A, 38911
-            JSR LINPRT
-            SET A, 32
-            JSR CHROUT
-            SET A, 6502
-            JSR LINPRT
-            SET A, CBM_RETURN
-            JSR CHROUT
-             ; skip shift check
-            JMP GETATHING
-
-            SET A, 2 ; check for key
-            SET B, 0x90 ; SHIFT
-            HWI [KEYBOARD]
-            IFE C, 1 ; if pressed
-                JMP GETATHING
-            SET C, 0
-            SET B, WORDS
-:TESTLOOP   SET A, [B]
-            IFE A, 0
-               JMP TESTPRG
-            JSR CHROUT
-            ADD B, 1
-            JMP TESTLOOP
-            JMP TESTPRG
-            ;dat 0 ; abort emulator
-
-:HALT SET [SCREENMEM], 0x4C21
-      JMP HALT
-
-
-:GETATHING
-    SET [TESTLEN], 0
-:GETATHINGLOOP
-    JSR CHRIN
-    ADD [TESTLEN], 1
-    IFN A, CBM_RETURN 
-       JMP GETATHINGLOOP
-    SET A, CBM_RETURN
-    JSR CHROUT
-    ;; display number of length
-    SET A, [TESTLEN]
-    SUB A, 1
-    JSR LINPRT
-    SET A, CBM_RETURN
-    JSR CHROUT
-    JMP GETATHING
-
-:TESTLEN
-    DAT 0
-
-;
-;  For cases when we want to run the command line debugger on a
-;  BASIC command, this types everything for us.
-;
-:RUN_TEST_STRING
-    SET I, BASIC_TEST_STRING
-    SET J, KEYD
-:TEST_STRING_LOOP
-    STI [J], [I]
-    IFN [J-1], 0
-        JMP TEST_STRING_LOOP
-    SUB J, KEYD
-    SET [NDX], J
-    RTS
-    
 ; C64 RAM equivalents
 ;
 :RAM03  
@@ -438,8 +334,6 @@ JMP [ROMFFFC]   ; RESET vector
 :KEYD
     .FILL KEYBOARD_BUFFER_SIZE 0
 
-.DEFINE BASIC_BUFFER_LENGTH 0x90
-
 :RAM01FB  DAT 0
 :RAM01FC  DAT 0
 :RAM01FD  DAT 0
@@ -485,9 +379,9 @@ JMP [ROMFFFC]   ; RESET vector
 ; BASIC Indirect Vector Table
 ; if you guys want to port the DOS wedge go ahead
 :RAM0300
-:IERROR     DAT ROME38B
+:IERROR     DAT DEF_ERROR
 :RAM0302
-:IMAIN      DAT ROMA483
+:IMAIN      DAT DEF_MAIN
 :RAM0304
 :ICRNCH     DAT DEF_CRUNCH    ; crunch tokens
 :RAM0306
@@ -1055,6 +949,8 @@ JMP [ROMFFFC]   ; RESET vector
             SET B, [VARTAB] ; End of program text
             SUB B, J
             ADD B, I       ; End when line is removed.
+			SET [VARTAB], B ; reclaim memory for variables
+			; handle problems
             ; due to the fact that zero is always a 16-bit zero,
             ; and never the high byte of a small number, 
             ; we might be able to relink the program within the
@@ -1062,9 +958,9 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMA4A9L
             STI [I], [J]
        		IFN I, B
-          	  JMP ROMA4A9L
-			;SET [I], [J]
-
+				JMP ROMA4A9L
+			SET [I], [J]
+			
 ; insert new line.
 :ROMA4ED    JSR ROMA659 ; clear variable memory
             JSR LINKPRG ; relink basic program
@@ -1073,7 +969,11 @@ JMP [ROMFFFC]   ; RESET vector
                 JMP ROMA480 ; delete only; return to prompt
             ; Make room for new line by moving the rest
             ; of the program up
-:ROMA4F8    SET A, [VARTAB]
+:ROMA4F8    SET EX, 0xA4F8
+            ; sanity check -- something's clearing VARTAB
+            IFE [VARTAB], 0
+                JMP VARTABCRASH
+            SET A, [VARTAB]
             SET [RAM5A], A  ; source end address
             ADD A, [COUNT]  ; add number of characters
             SET [RAM58], A  ; destination end address
@@ -1093,12 +993,6 @@ JMP [ROMFFFC]   ; RESET vector
                 JMP ROMA522L
 :ROMA52A    JSR ROMA659 ; clr?
             JSR LINKPRG
-            ; properly mark end of program.
-            ;SET I, [VARTAB]
-            ;SET [I], 0xC030
-            ;SET [I-1], 0xC031
-            ;SET [I-2], 0xC032
-            ;SET [I-3], 0xC033
             JMP [IMAIN]
 
 ; relink basic program
@@ -1106,8 +1000,7 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMA533    
             SET I, [TXTTAB]
             SET J, I   ; note beginning of line
-:ROMA53C    ADD I, 1   ; get link to next line
-            IFE [I], 0 ; no link; must be end of program
+:ROMA53C    IFE [I+1], 0 ; no link; must be end of program
                 RTS
             ADD I, 1   ; skip over line number
 :ROMA544    ADD I, 1   ; go to next character
@@ -1243,8 +1136,7 @@ JMP [ROMFFFC]   ; RESET vector
             IFC A, 0x80 ; unshifted
                 JMP ROMA5C7
             ; branches here if null character found
-:ROMA609    ;SET [RAM01FF+Y], 0  ; ends with two NULLs in a row
-            SET [RAM01FE+Y], 0  ; ends with three? NULLs in a row
+:ROMA609    SET [RAM01FE+Y], A  ; ends with two NULLs in a row
             ;SET [RAM0200-3+Y], 0
 :ROMA60C    SET [RAM7A], RAM0200-1
             RTS
@@ -1281,9 +1173,8 @@ JMP [ROMFFFC]   ; RESET vector
                 RTS
 :ROMA644    SET I, [TXTTAB]
             SET [I], 0
-            SET [I+1], 0
             ; SET [I+1], 0 if it's unconnected
-            ADD I, 1
+            ADD I, 2
             SET [VARTAB], I
 :ROMA659    JSR ROMA68E ; set execution pointer to [TXTTAB]-1
 
@@ -2282,7 +2173,6 @@ JMP [ROMFFFC]   ; RESET vector
             SET PUSH, A
             JMP I    ; instead of RTS
 
-
 ; Pop ARG from stack (4 WORDS)
 :ROMAE58    SET Y, -1
             SET A, POP
@@ -2305,7 +2195,6 @@ JMP [ROMFFFC]   ; RESET vector
             ASR A, 15
             SET [ARISGN], A
 :ROMAE80    SET A, [FACEXP]
-			SET J, CRASH
 :ROMAE82    RTS
 
 ; get arithmetic element routine            
@@ -2588,7 +2477,7 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMB143    SET [RAM5F], [ARYTAB] ; start of source
             SET A, [STREND] ; end of all variables
             SET [RAM5A], A  ; end of source
-            ADD A, 5
+            ADD A, 5        ; room for one variable
             SET [RAM58], A ; end of destination
             JSR BLTU
             ; move array table up
@@ -4479,9 +4368,13 @@ JMP [ROMFFFC]   ; RESET vector
         JMP SCANSPECIAL
     IFB Y, 0x80
         JMP SCANARROWS
-    IFG Y, 0x60 ; TEMPORARY un-capsing
-        SUB Y, 0x20
     SET [SFDX], Y
+    ; handle letter shifting
+    IFG Y, 0x60 ; lowercase letters
+        SUB [SFDX], 0x20  ; are "unshifted"
+    IFG Y, 0x40
+      IFL Y, 0x5B
+        ADD [SFDX], 0x80
     RTS
 
 :SCANSPECIAL
@@ -5164,7 +5057,7 @@ RTS
 :ROME386
             SET X, 0x80
             JMP [IERROR] ;normally E38B
-    
+:DEF_ERROR    
 :ROME38B ; error message handler
             SET A, X
             IFG A, 0x7F
@@ -5888,6 +5781,18 @@ RTS
     DAT 0xf80, 0x840, 0xf88, 0x444
     DAT 0x888, 0x8f8, 0x88f, 0xccc
 
+:BASCRASH
+    SET A, [TXTTAB+1]
+    SET B, [TXTTAB+2]
+    SET C, [TXTTAB+3]
+    SET X, [TXTTAB+4]
+    SET Y, [TXTTAB+5]
+    SET Z, [TXTTAB+6]
+    SET I, [TXTTAB+7]
+    SET J, [TXTTAB+8]
+	SET EX, [TXTTAB+9]
+	DAT 0x2400
+	    
 :VARTABCRASH
     SET A, [VARTAB]
     SET B, [STREND]
