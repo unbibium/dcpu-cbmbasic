@@ -473,7 +473,7 @@ JMP [ROMFFFC]   ; RESET vector
 :TOKEN_ROUTINES
 :ROMA00C
             DAT STMT_END
-            DAT 0xA741   ; for
+            DAT STMT_FOR
             DAT STMT_NEXT
             DAT STMT_DATA
             DAT STMT_INPUTN
@@ -817,18 +817,65 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMA389   DAT 0xA0
 
 
+:PEEKSTACK
+			SET [0], SP
+			SET J, 0
+:PEEKLOOP	SET A, [0]
+			SET A, [A]
+			ADD [0], 1
+			ADD J, 1
+			JSR LINPRT
+			IFL [RAM49], STACKBASEND
+				JMP PEEKLOOP
+			SET Z, 0
+			RTS
+			
+
 :FNDFOR
-; Search for "FOR" blocks on stack
-:ROMA38A    SET X, SP
-            ; TODO:  2 if they turn out to be addresses
-            ADD X, 4 
-            IFN [X+1], BASIC_FOR_TOKEN ; FOR block
-                RTS ; no, just a GOSUB
-:ROMA39A    SET [VARPNT], [X+2]
-            IFE [VARPNT], [X+2]
-                RTS
-:ROMA3B0    ADD X, 18   ; OR whatever
-:ROMA3B7    RTS
+; Search for "FOR" blocks on stack containing
+; the current variable.  If found, returns the
+; stack location as X, and Z=1.  Otherwise, Z=0
+:ROMA38A    SET Z, 0
+			SET X, SP
+            ADD X, 2 ; make allowance for two JSRs 
+:ROMA38F    SET A, [X]
+			IFN A, BASIC_FOR_TOKEN ; FOR block
+                RTS ; not a FOR block.
+:ROMA39A    IFN [FORPNT], 0
+				JMP ROMA3A4
+			SET [FORPNT], [X+1]
+:ROMA3A4	SET A, [X+1]
+			IFE [FORPNT], A
+				JMP ROMA3B7
+:ROMA3B0    ADD X, 11
+			JMP ROMA38F
+:ROMA3B7    SET Z, 1 ; "found" result
+			RTS
+			
+:DEBUGFORx	SET A, PEEK
+			JSR LINPRT
+			SET A, PICK 0
+			JSR LINPRT
+			SET A, PICK 1
+			JSR LINPRT
+			SET A, PICK 2
+			JSR LINPRT
+			SET A, PICK 3
+			JSR LINPRT
+			SET A, PICK 4
+			JSR LINPRT
+			SET A, PICK 5
+			JSR LINPRT
+			SET A, 13
+			JSR CHROUT
+			SET A, BASIC_FOR_TOKEN
+			JSR LINPRT
+			SET A, 13
+			JSR CHROUT
+			
+:DEBUGFOR	SET Z, 0
+			RTS
+			
 
 :BLTU
 ; Parameters in [RAM5F], [RAM5A], and [RAM58]
@@ -1297,6 +1344,59 @@ JMP [ROMFFFC]   ; RESET vector
                 JMP ROMA6EF  ; print last character and return to loop
             JSR ROMAB47 ; print character in token
             JMP ROMA737
+
+; FOR statement
+; calls STMT_LET and pushes 11 words onto the stack:
+;    pointer to first statement in loop      @ 10
+;    line number of same                     @ 9
+;    TO target as 3-word float               @ 6-8   
+;    STEP increment as 4-word float          @ 2-5   
+;    pointer to variable being incremented   @ 1   
+;    FOR token                               @ 0 - shallow  
+
+:STMT_FOR
+:ROMA742	SET [RAM10], 0x80
+			JSR STMT_LET
+			JSR FNDFOR
+			IFE Z, 0 ;
+				JMP ROMA753
+			; we're already looping on this variable
+			ADD X, 10  ; is this right?
+			SET SP, X  ; purge that loop from the stack 
+:ROMA753	SET A, POP ; discard JSR
+			SET A, 11   ; test for this many bytes available
+			JSR GETSTK
+			JSR ROMA906 ; get end of statement
+			SET PUSH, I        ; push first statement in loop ; +1
+			SET PUSH, [CURLIN] ; push line number             ; +1
+			SET A, BASIC_TO_TOKEN   ; TO token
+			JSR SYNCHR
+			JSR ROMAD8D  ; left side of TO must be numeric
+			JSR FRMNUM   ; get number on right side of TO
+			; Compress FACSGN into FACHO;
+			; pushing only 3 words.
+			SET A, [FACSGN]
+			BOR A, 0x7F
+			AND A, [FACHO]
+			SET [FACHO], A
+			SET I, ROMA78B  ; return vector
+			JMP ROMAE43 ; push TO target value    +3
+			; it returns here
+:ROMA78B	SET A, FONE ; STEP 1 by default
+			JSR MOVFM
+			JSR CHRGOT
+			IFN A, BASIC_STEP_TOKEN  ; STEP token?
+				JMP ROMA79F
+			JSR CHRGET
+			JSR FRMNUM ; get STEP value
+:ROMA79F	JSR SIGN
+			JSR ROMAE38  ; push STEP with separate sign byte +4
+			SET PUSH, [FORPNT] ; pointer to increment variable +1
+			SET PUSH, BASIC_FOR_TOKEN
+			;SET A, PEEK
+			;SET B, PICK 1
+			;SET C, PICK 2
+			;DAT 0x0C00
 
 ; execute next statement
 
@@ -2019,20 +2119,46 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMAD0C
     DAT "?REDO FROM START", CBM_RETURN, 0
 
-; NEXT statement
+; NEXT statement - see STMT_FOR
 :STMT_NEXT
 :ROMAD1E    IFE Z, 0
                 JMP ROMAD24
-            SET Y, 0
+			SET Y, 0     ; don't know which variable to advance
             JMP ROMAD27
 :ROMAD24    JSR PTRGET   ; get variable to advance in Y
 :ROMAD27    SET [FORPNT], Y
             JSR FNDFOR
-            IFE A, 0
+            ; [FORPNT] contains the variable we're really looping
+            IFE Z, 1    ; found the variable
                 JMP ROMAD35
 :ROMAD30    SET X, 0x0A ; ?NEXT WITHOUT FOR
             JMP ERROR
-:ROMAD35    DAT 0x5000 ; i should really finish the cruncher first
+:ROMAD35    SET SP, X  ; synchronize stack with that FOR
+			; this discards any inner loops we've skipped
+:ROMAD42	SET A, SP
+			ADD A, 2   ; pointer to STEP value
+			JSR MOVFM  ; set FAC1
+			SET [FACSGN], PICK 5
+:ROMAD4B	SET A, [FORPNT] ; pointer to loop variable
+:ROMAD4F	JSR FADD        ; add to STEP value
+			JSR ROMBBD0     ; set loop variable to result
+			SET A, SP
+			ADD A, 6   ; pointer to TO value
+			JSR FCOMP ; compare TO value (I) with loop variable
+			; break out if comparison matches sign of STEP
+			IFE A, PICK 5
+				JMP ROMAD78
+:ROMAD61	; last time through loop
+			SET [CURLIN], PICK 9
+			SET [RAM7A], PICK 10
+:ROMAD75	JMP NEWSTT
+			; end of loop
+:ROMAD78	ADD SP, 11    ; pop FOR block from stack
+			JSR CHRGOT
+:ROMAD80	IFN A, CBM_COMMA
+				JMP NEWSTT
+			JSR CHRGET   ; it's NEXT X,Y -- do NEXT Y also
+			JSR ROMAD24  ; must JSR so that the POP works.
  
 ; get formula, enforce that it is a number.
 :FRMNUM
@@ -2164,9 +2290,12 @@ JMP [ROMFFFC]   ; RESET vector
 ; save rounded value of left operand
 ; X is set to the first column of the operator table
 :ROMAE33    SET X, [TBL_OP+Y]
-			SET I, POP
-            SET PUSH, [FACSGN]
-            JSR ROUND
+			SET A, [FACSGN]
+			; Other entry points are used by FOR
+			; statement to push floats.
+:ROMAE38	SET I, POP
+            SET PUSH, A
+:ROMAE43    JSR ROUND
             SET PUSH, [FACHO+1]
             SET PUSH, [FACHO]
             SET A, [FACEXP]
@@ -3038,6 +3167,10 @@ JMP [ROMFFFC]   ; RESET vector
 :ROMB862    JSR ROMB999
             JMP ROMB8A3
 
+;
+;  FLOATING POINT ADDITION.
+; should not destroy I, J.
+;
 :FADD
 :ROMB867    JSR CONUPK ; read from pointer in A,
                         ; store to ARG.
@@ -3190,8 +3323,8 @@ JMP [ROMFFFC]   ; RESET vector
 :OVERR ; Print overflow error message
 :ROMB97E
             ; crash instead for debugging
-            SET A,0x897E
-            JMP FACCRASH
+            ;SET A,0x897E
+            ;JMP FACCRASH
             SET X, 0x0F
             JMP ERROR
 
@@ -3473,48 +3606,7 @@ JMP [ROMFFFC]   ; RESET vector
             SET [FACHO+1], [RESHO+1]
             JMP ROMB8D7
             
-; MOVE rounded FAC into ARG
-:MOVAF 
-:ROMBC0C    JSR ROUND
-:MOVEF
-:ROMBC0F    SET [ARGSGN], [FACSGN]
-            ASR [ARGSGN], 15 ; Attempt
-            SET [ARGHO+1], [FACHO+1]
-            SET [ARGHO], [FACHO]
-            SET [ARGEXP], [FACEXP]
-            SET [FACOV], 0
-            ; Preserve side effect in 6502 version
-            SET A, [FACEXP]
-            RTS
-
-; Round Accumulator #1 by Adjusting the Rounding Byte
-:ROUND
-:ROMBC1B    IFE [FACEXP], 0
-                RTS
-            SHL [FACOV], 1
-            IFE EX, 0
-                RTS
-            ; increment mantissa
-            ADD [FACHO+1], 1
-            ADX [FACHO], 0  
-            IFE EX, 0
-                RTS
-            ; mantissa overflowed;
-            ; shift it to the right
-            JMP ROMB938
-            
-; get sign of float accu in A
-:SIGN
-:ROMBC2B    SET A, [FACEXP]
-            IFE A, 0
-                RTS
-:ROMBC2F    SET A, [FACSGN]
-; Return pure +1 or -1.
-:ROMBC31    ASR A, 15
-            BOR A, 1
-            RTS
-
-
+	
 
 ; Move a FP number from memory pointer in A to FAC1
 :MOVFM
@@ -3557,6 +3649,46 @@ JMP [ROMFFFC]   ; RESET vector
             SET [FACHO], [ARGHO]
             SET [FACEXP], [ARGEXP]
             SET [FACOV], 0
+            RTS
+; MOVE rounded FAC into ARG
+:MOVAF 
+:ROMBC0C    JSR ROUND
+:MOVEF
+:ROMBC0F    SET [ARGSGN], [FACSGN]
+            ASR [ARGSGN], 15 ; Attempt
+            SET [ARGHO+1], [FACHO+1]
+            SET [ARGHO], [FACHO]
+            SET [ARGEXP], [FACEXP]
+            SET [FACOV], 0
+            ; Preserve side effect in 6502 version
+            SET A, [FACEXP]
+            RTS
+
+; Round Accumulator #1 by Adjusting the Rounding Byte
+:ROUND
+:ROMBC1B    IFE [FACEXP], 0
+                RTS
+            SHL [FACOV], 1
+            IFE EX, 0
+                RTS
+            ; increment mantissa
+            ADD [FACHO+1], 1
+            ADX [FACHO], 0  
+            IFE EX, 0
+                RTS
+            ; mantissa overflowed;
+            ; shift it to the right
+            JMP ROMB938
+            
+; get sign of float accu in A
+:SIGN
+:ROMBC2B    SET A, [FACEXP]
+            IFE A, 0
+                RTS
+:ROMBC2F    SET A, [FACSGN]
+; Return pure +1 or -1.
+:ROMBC31    ASR A, 15
+            BOR A, 1
             RTS
 
 ; SGN function
@@ -3602,7 +3734,8 @@ JMP [ROMFFFC]   ; RESET vector
 ;              +1 if FAC1 is higher
 :FCOMP
 :ROMBC5B    SET I, A    ; I points to exponent
-            SET X, [I]  ; X contains exponent
+:FCOMPI
+:ROMBC5D    SET X, [I]  ; X contains exponent
 :ROMBC63    ADD I, 1    ; I points to mantissa
             IFE X, 0
                 JMP SIGN ; return sign of FAC1?
@@ -3632,15 +3765,15 @@ JMP [ROMFFFC]   ; RESET vector
                 SET EX, 0
 :ROMBC8C    SET X, [I+1]
             SBX X, [FACHO+1]
+            SET A, 0
 :ROMBC90    IFE X, 0
                 RTS ; give up on comparison?
 ; in 6502, C=1 meant memory was higher..
 ; in DCPU-16, EX=0 meant memory was higher.
-:ROMBC92    SET X, [FACSGN]
+:ROMBC92    SET A, [FACSGN]
             IFE EX, 0 ; no underflow in the subtract
-                XOR X, -1
-            SET A, X  ; ROMBC31nex
-            JMP ROMBC31
+                XOR A, -1
+            JMP ROMBC31 ; return pure 0 or 1
 
 ; Convert float to a signed integer
 :QINT
