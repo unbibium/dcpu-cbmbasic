@@ -1657,22 +1657,17 @@ JMP [ROMFFFC]   ; RESET vector
 
 ; RETURN command
 :STMT_RETURN
-:ROMA8D2   IFE Z, 0
+:ROMA8D2    IFE Z, 0
                 RTS
-:ROMA8D4   SET [RAM4A], -1          ; LDA #$FF
-:ROMA8D6                            ; STA $4A
-:ROMA8D8   JSR FNDFOR   ; Search for FOR blocks on stack
-           ; NOW:
-:ROMA8DB   SET SP, X          ; TXS
-:ROMA8DC    IFE A, BASIC_GOSUB_TOKEN ; CMP #$8D   ; GOSUB
-:ROMA8DE        JMP ROMA8EB
-:ROMA8E0    SET X, 0x0C  ; ?RETURN WITHOUT GOSUB
-:ROMA8E2        JMP ERROR
+			BOR [RAM49], 0xFF00 ; in case GOSUB from immediate
+			JSR FNDFOR   ; Search for FOR blocks on stack
+			SET SP, X
+			IFE PEEK, BASIC_GOSUB_TOKEN ; CMP #$8D   ; GOSUB
+				JMP ROMA8EB
+			SET X, 0x0C  ; ?RETURN WITHOUT GOSUB
+            IFN X, 0x0C  ; skip next
 :ROMA8E3    SET X, 0x11 ; ?undef'd statment
-:ROMA8E5        JMP ERROR
-
-; alternate entry for syntax error
-:ROMA8E8   JMP SNERR
+		        JMP ERROR
 
 ; Remove GOSUB block from stack
 :ROMA8EB    SET A, POP ; consume GOSUB token
@@ -1680,7 +1675,7 @@ JMP [ROMFFFC]   ; RESET vector
             SET [RAM7A], POP
 
 :STMT_DATA
-:ROMA8F8    JSR ROMA906 ; get end of line
+:ROMA8F8    JSR ROMA906 ; get end of statement
             ; instead of returning number to add in Y,
             ; returns complete address in I.
 :ROMA8FB        SET [RAM7A], I
