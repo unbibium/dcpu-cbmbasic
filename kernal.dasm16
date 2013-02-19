@@ -3003,9 +3003,11 @@ JMP [ROMFFFC]   ; RESET vector
             JSR EVAL
             JSR ROMAD8F ; check that value is string
             SET [RAM6F], POP
-            SET A, [RAM6F]
-            ADD A, [RAM64]
-            IFL A, 0x100
+            SET Y, [RAM6F]
+            SET A, [Y]  ; Get length of first string
+            SET Y, [RAM64]
+            ADD A, [Y]  ; Get length of second string
+            IFL A, 0x100 ; TODO: make customizable
                 JMP ROMB65D
             SET X, 0x17 ; ?STRING TOO LONG
             JMP ERROR
