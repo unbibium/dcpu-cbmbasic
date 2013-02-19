@@ -5179,14 +5179,6 @@ RTS
     set B, 9  ; light blue
     hwi [MONITOR]
 
-    set X, 0x9120
-    set I, SCREENMEM
-    SET [SCREENPTR], I
-    :CLSLOOP
-    sti [I], X
-    ifl I, SCREENMEMEND
-       JMP CLSLOOP
-    SET X, 0x5150
     JSR MAKE_CBM_FONT
 :initialize_keyboard
     SET A, 3
