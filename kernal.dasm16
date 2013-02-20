@@ -1,25 +1,8 @@
-; DCPU-16 KERNAL and BASIC based on the Commodore 64 KERNAL
-; by Nick Bensema
 
-
-; why aren't these standard?
-; these defines should work on most assemblers.
-.DEFINE JMP SET PC,
-.DEFINE RTS SET PC, POP
-
-.DEFINE TOKEN_NAMES_1 TOKEN_NAMES-1
-
-JMP [ROMFFFC]   ; RESET vector
-
-; mostly testing stuff is here.
-.INCLUDE "config.dasm16"
-
-.DEFINE HW_COLS 32
 
 ; todo: use a bunch of IFDEFs to hide all the debugging code
 ; when HW_ROWS >= 12.
 
-.DEFINE TXTPTR RAM7A
 
 ; I used to use a FILL here but this made the hex dump too
 ; large to paste into web forms.
