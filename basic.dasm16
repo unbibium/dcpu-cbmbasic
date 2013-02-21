@@ -1388,6 +1388,8 @@
             ADD A, 1 ; skip over null 
             IFG [CURLIN], [LINNUM]
                 SET A, [TXTTAB] ; start at beginning
+            IFE [CURLIN], [LINNUM]
+                SET A, [TXTTAB] ; start at beginning
             JSR FINDLNA ; set [RAM5F] to address of target
             IFE C, 0 ; BCC $A8E3
                 JMP ROMA8E3 ; throw ?UNDEF'D STATEMENT
@@ -1777,10 +1779,7 @@
 			SET A, [CHANNL]
             IFN A, 0
                 JMP [ROMAC4A]
-            SET PUSH, [COLOR]
-            SET COLOR, 0x0100
             JSR ROMAB45 ; print question mark
-            SET POP, [COLOR]
 :ROMAC4A    JSR ROMABF9 ; get line into input buffer
 :ROMAC4D    SET [RAM7A], X
 :ROMAC51    JSR CHRGET
