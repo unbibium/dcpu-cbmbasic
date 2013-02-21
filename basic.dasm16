@@ -1117,7 +1117,7 @@
 			; Compress FACSGN into FACHO;
 			; pushing only 3 words.
 			SET A, [FACSGN]
-			BOR A, 0x7F
+			BOR A, 0x7FFF
 			AND A, [FACHO]
 			SET [FACHO], A
 			SET I, ROMA78B  ; return vector
