@@ -2958,7 +2958,7 @@
 
 
 
-:ROMB862    JSR ROMB999
+:ROMB862    JSR SHIFT_RIGHT
             JMP ROMB8A3
 
 ;
@@ -3123,7 +3123,7 @@
             JMP ERROR
 
 ; I think this routine inserts a byte at the beginning
-; of the mantissa.
+; of the mantissa, using BITS as a high overflow byte.
 :MULSHF 
 :ROMB983   SET X, RESHO-1 ; RESHO has no exponent
             ; shift 8 bits from
@@ -3133,15 +3133,13 @@
             SHR [X+1], 8
             BOR [X+2], EX
             ASR [BITS], 8
-            ;SET Y, [BITS]
-            ;ASR Y, 8 ; Non-descructive shift
+            SET Y, [BITS]
+            ASR Y, 8 ; Non-descructive shift
             BOR [X+1], EX
-            
-        ; set X to FACEXP or ARGEXP before calling here
+:SHIFT_RIGHT          
+        ; set X to pointer to FACEXP or ARGEXP before calling here
         ; set A to the actual exponent therein
-        ; and possibly set Y to some negative number
-:ROMB999
-            ADD A, 8
+:ROMB999    ADD A, 8
 :ROMB99B    IFB A, 0x80    ; BMI
                 JMP ROMB985 ; make 8 more high bits
             IFC A, 0xFF    ; BEQ with low 8 bits
@@ -3160,9 +3158,9 @@
             ; ROR [X+1] -> [X+2] -> A
 :ROMB9AC    SHR [X+1], 1
             BOR [X+1], C
-            SET C, EX  ; NEW
+            SET C, EX  
 :ROMB9AE    SHR [X+1], 1
-            BOR [X+1], C ; NEW
+            BOR [X+1], C 
             ; might jump here if X+1 is already shifted
 :ROMB9B0    SET C, EX
             SHR [X+2], 1
@@ -3212,13 +3210,15 @@
 :FMULTT
 :ROMBA2B    IFE A, 0  
                 RTS ; anything times 0 = 0
+            JSR MULDIV ; add exponents
             SET [RESHO], 0
             SET [RESHO+1], 0
 :ROMBA3D    SET A, [FACOV]
-            JSR ROMBA59
+            JSR ROMBA59  ; multiply A and add to RESHO
             SET A, [FACHO+1]
-            JSR ROMBA59
+            JSR ROMBA59  
             SET A, [FACHO]
+            JSR ROMBA5E
             JMP ROMBB8F  ; ???
 
             ; BIT-SHIFT ADDER
@@ -3263,8 +3263,9 @@
             SET [ARGHO+1], [A+2]
             SET A, [FACEXP]
             RTS
-; Add FACEXP to ARGEXP, responsibly.
-; Should have pushed two things onto A I guess
+; Add exponents of ARG and FAC
+; (called by FMULT and FDIV)
+; also check for overflow and set result sign
 :MULDIV
 :ROMBAB7    SET A, [ARGEXP]
             IFE A, 0
@@ -3288,14 +3289,16 @@
 :ROMBAD3    RTS
 :ROMB8FB	SET [FACSGN], A
 			RTS
-
+; if FAC is positive, give OVERR
+; if FAC is negative, set FAC=0, pop one return,
+; and RTS.  called from EXP function
 :MLDVEX
 :ROMBAD4    SET A, [FACSGN]
             XOR A, -1
             IFB A, 0x8000
                 JMP OVERR
+; pop return address and set FAC=0
 :ROMBADA    SET A, POP
-            ;SET A, POP
             ; popped values will be discarded
             JMP ROMB8F7 ; zero FACEXP and FACSGN
 
@@ -3323,14 +3326,14 @@
 
 :DIV10
 :ROMBAFE
-        JSR MOVAF
+        JSR MOVAF  ; ARG = FAC
         SET A, TENC
         SET X, 0
         SET [ARISGN], X
         JSR MOVFM  ; FAC1 = 10
-        JMP FDIVT
+        JMP FDIVT ; return 10/FAC?
 :FDIV
-:ROMBB0F    JSR CONUPK ; should return exp in A
+:ROMBB0F    JSR CONUPK ; copy to ARG; should return exp in A
 :FDIVT
 :ROMBB12    IFE A, 0  ; dividing by 0?
                 JMP ROMBB8A ; oh shi--
@@ -3343,7 +3346,7 @@
             ADD [FACEXP], 1
             IFB [FACEXP], 0x100
                 JMP OVERR
-:ROMBB25    SET X, RESHO
+:ROMBB25    SET X, RESHO-2 ; negatie mantissa bytes
             
 :ROMBB29    SET EX, 0
             IFL [ARGHO], [FACHO]
@@ -3358,17 +3361,18 @@
             ;Carry bit is set if ARGHO >= FACHO
             ; or if the shift-left at ROMBB4F
             ; resulted in an overflow
-:ROMBB3F    SET PUSH, EX
+:ROMBB3F    SET PUSH, EX ; simulate PHP
+			; simulate ROL 
             SHL A, 1 ; 
-            SET C, EX
+            SET C, EX    ; store carry bit off left side of A
             ADD A, PEEK  ; add carry bit from result
             IFN C, 0 ; off left side
                 JMP ROMBB4C
             ADD X, 1
             SET [X], A
-            IFC X, 0xFF
+            IFE X, RESHO
                 JMP ROMBB7A
-            IFC X, 0x80 
+            IFG X, RESHO 
                 JMP ROMBB7E  ; Store to [FACOV]
             SET A, 1
 :ROMBB4C    SET EX, POP
@@ -3558,6 +3562,7 @@
             IFB [FACOV], 0x8000
                 SET EX, 0
 :ROMBC8C    SET X, [I+1]
+
             SBX X, [FACHO+1]
             SET A, 0
 :ROMBC90    IFE X, 0
@@ -3569,7 +3574,16 @@
                 XOR A, -1
             JMP ROMBC31 ; return pure 0 or 1
 
-; Convert float to a signed integer
+; ----------------------------------------------------------------------------
+; QUICK INTEGER FUNCTION
+;
+; CONVERTS FP VALUE IN FAC TO INTEGER VALUE
+; IN FAC+1...FAC+4, BY SHIFTING RIGHT WITH SIGN
+; EXTENSION UNTIL FRACTIONAL BITS ARE OUT.
+;
+; THIS SUBROUTINE ASSUMES THE EXPONENT < 32.
+; ----------------------------------------------------------------------------
+
 :QINT
 :ROMBC9B    SET A, [FACEXP]
             IFE A, 0
@@ -3578,12 +3592,12 @@
             AND A, 0xFF
             IFC [FACSGN], 0x8000
                 JMP ROMBCAF ; skip two lines if positive
-            SET [BITS], -1  ; overflow digit = -1
+            SET [BITS], -1  ; shift 1s from the left instead of 0s
             JSR ROMB94D  ; multiply mantissa by -1
 :ROMBCAF    SET X, FACEXP ; pointer to MULSHF operand
             IFG A, 0xF8   ; CMP 0xF9
                 JMP ROMBCBB
-            JSR ROMB999  ; MULSHF offset
+            JSR SHIFT_RIGHT  ; MULSHF offset
             SET [BITS], Y
 :ROMBCBA    RTS
             
