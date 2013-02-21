@@ -40,20 +40,20 @@ mostly like they do on the C64:
 * Program entry
 * Immediate mode
 * BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, 
-                  NEW, STOP, REM, IF, FOR, NEXT, DATA
+                  NEW, STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT
 * BASIC keyword abbreviations with shifted second letters
 * The ? abbreviation for PRINT
-* Expressions involving integers, addition, and subtraction:
-    PRINT 3+4
-    LET A=5-9
-* String literals
-* Allocating and printing string variables like A$
-* Allocating and using float variables like A
+* Expressions involving positive integers, addition, subtraction,
+  and multiplication.
+* String literals and concatenation.
+* Allocating, setting, and retrieving string variables like A$
+* Allocating, setting, and retrieving float variables like A
 
 Just about anything else won't work, and may even crash the machine.
 Even some of the above are useless due to a lack of supporting
 functions like comparison operators, inputting numbers with decimal
-points, functions, string concatenation, or input from the user.  
+points, the division operator, or functions like RND() and MID$().  
+It's rapidly becoming more complete.
 
 This program was developed using the DCPU toolchain at
 http://dcputoolcha.in/ -- mostly the command-line tools,
@@ -79,9 +79,4 @@ possible the program's components can be separated, depending on
 how thoroughly useful it becomes.  The floating point routines can
 probably be separated, and the BASIC can certainly be separated
 from the KERNAL.
-
-If you want a reliable BASIC interpreter for your DCPU-16, a better
-place to start might be to port another BASIC implementation to one
-of the more venerable kernals, such as one of these:
-http://www.ittybittycomputers.com/IttyBitty/TinyBasic/
 
