@@ -1734,24 +1734,6 @@ RTS
 :ROMFFFE  DAT ROMFF48     ; BRK vector
 
 
-:XFACCRASH  SET I, [X+1]
-            SET J, [X+2]
-            SET EX, [X]
-            SET Z, [X+3]
-            JMP CRASH
-:FACCRASH   SET B, [ARGHO]
-			SET C, [ARGHO+1]
-			SET X, [ARGEXP]
-			SET A, [ARGSGN]
-			SET Y, [ARISGN]
-			SET I, [FACHO]
-            SET J, [FACHO+1]
-            SET EX, [FACEXP]
-            SET Z, [FACSGN]
-            BOR 0xBCBC, 0xBCBC
-            JMP CRASH
-
-
 :MAKE_CBM_FONT
     SET A, 4 ; DUMP FONT
     SET B, VISFONT  ; visible font area

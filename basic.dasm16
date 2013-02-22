@@ -41,10 +41,10 @@
     .FILL 10 0
 :TEMPSTEND
 :RAM22
-:INDEX  DAT 0
+:INDEX  DAT 0, 0
 :RESHO ; multiplication argument - mantissa only
 :RAM26  DAT 0
-:RAM27  DAT 0
+:RAM27  DAT 0, 0
 ; Pointer to the start of BASIC program text
 :RAM2B  
 :TXTTAB DAT BASICMEM+1
@@ -2090,7 +2090,7 @@
             JMP CHRGET
 :PIVAL      DAT 0x82, 0x490F, 0xDAA1  ; float value of PI
 			; not a digit, variable, or pi:
-:ROMAEAD    SET C, 0
+:ROMAEAD    SET C, 1 ; so FIN knows dot isn't a digit
             IFE A, 0x2E ; Decimal point
                 JMP FIN ; read a number
             IFE A, BASIC_MINUS_TOKEN
@@ -3406,62 +3406,63 @@
 :ROMBB12    IFE A, 0  ; dividing by 0?
                 JMP ROMBB8A ; oh shi--
             JSR ROUND
-:ROMBB21    SET A, [FACEXP]
-            MUL A, -1
+:ROMBB21    SET A, 0
+			SUB A, [FACEXP]
             AND A, 0xFF
             SET [FACEXP], A
-            JSR MULDIV
+            JSR MULDIV ; add exponents
             ADD [FACEXP], 1
             IFB [FACEXP], 0x100
                 JMP OVERR
-:ROMBB25    SET X, RESHO-2 ; negatie mantissa bytes
-            
-:ROMBB29    SET EX, 0
-            IFL [ARGHO], [FACHO]
-                JMP ROMBB3F
-            IFE [ARGHO], [FACHO]
-                JMP ROMBB39A
-            SET EX, 1
-            JMP ROMBB3F
-:ROMBB39A   IFL [ARGHO], [FACHO]
-                JMP ROMBB3F
-            SET EX, 1
-            ;Carry bit is set if ARGHO >= FACHO
+:ROMBB25    SET X, RESHO-1
+            SET A, 1 ; "stop" bit -- when this 1 goes off the
+                     ; left side of A, we store the byte to [X+1].
+:ROMBB29    SET Y, [ARGHO]
+			SUB Y, [FACHO]
+			IFN Y, 0
+			    JMP ROMBB3F
+			SET Y, [ARGHO+1]
+			SUB Y, [FACHO+1]
+            ;6502: Carry bit is set if ARGHO >= FACHO
             ; or if the shift-left at ROMBB4F
             ; resulted in an overflow
+            ;DCPU: EX = -1 represents carry clear case
+            ;      EX = 0 represents carry set case
 :ROMBB3F    SET PUSH, EX ; simulate PHP
-			; simulate ROL 
-            SHL A, 1 ; 
-            SET C, EX    ; store carry bit off left side of A
-            ADD A, PEEK  ; add carry bit from result
+            SHL A, 1  ; shifting part of ROL
+            SET C, EX ; store carry bit off left side of A
+            IFE PEEK, 0
+                BOR A, 1 ; carry-add part of ROL
             IFN C, 0 ; off left side
                 JMP ROMBB4C
-            ADD X, 1
+			; we have enoiugh bits in A to store a byte
+			; into RESHO now.
+            ADD X, 1  
             SET [X], A
-            IFE X, RESHO
+            IFE X, RESHO+1
                 JMP ROMBB7A
-            IFG X, RESHO 
+            IFG X, RESHO+1
                 JMP ROMBB7E  ; Store to [FACOV]
-            SET A, 1
+            SET A, 1 ; "stop" bit of next byte
 :ROMBB4C    SET EX, POP
-:ROMBB4D    IFN EX, 0
+:ROMBB4D    IFE EX, 0
                 JMP ROMBB5D
+            ; subtract 1 at left of ARGHO and re-normalize.
 :ROMBB4F    SHL [ARGHO], 1
             SET C, EX
             SHL [ARGHO+1], 1
             BOR [ARGHO], EX
             IFN C, 0 ; bit fell off left side of mantissa
-                JMP ROMBB3F
-            IFB [ARGHO], 0x8000
-                JMP ROMBB29
+                JMP ROMBB3F ; rotate A left too.
+            IFB [ARGHO], 0x8000  ; ARG is normalized
+                JMP ROMBB29 ; subtract again
             JMP ROMBB3F
-            ; originally BB5D preserved Y. Why?
+            ; originally BB5D preserved  A. 
 :ROMBB5D    SUB [ARGHO+1], [FACHO+1]
             SBX [ARGHO], [FACHO]
             JMP ROMBB4F
-:ROMBB7A    SET A, 0x40 ; AT-SIGN?
-:ROMBB7C    IFN A, 0
-                JMP ROMBB4C
+:ROMBB7A    SET A, 0x4000 
+			JMP ROMBB4C
 :ROMBB7E    SHL A, 14 ; originally 6
             SET [FACOV], A
             SET EX, POP  ; PLP?
@@ -3695,12 +3696,13 @@
             SET [FACHO+1], 0
             RTS
 
+:DECFLG	DAT 0
 :FIN ; convert ascii string to a float in FAC1
 :ROMBCF3    SET Y, 0
             SET X, 0
             SET [DECEXP], 0
             SET [RAM5E], 0
-            SET [RAM5F], 0
+            SET [DECFLG], 0
             SET [RAM60], 0
             SET [FACEXP], 0
             SET [FACHO], 0
@@ -3718,9 +3720,11 @@
             ; get digit after +/-
 :ROMBD0A    JSR CHRGET
             ; parse a digit
-:ROMBD0D    IFE C, 0
+:ROMBD0D    IFE C, 0    ; is a digit
                 JMP ROMBD6A
-:ROMBD0F    IFE A, 0x2E ; decimal point
+:ROMBD0F    XOR A, 0x2E2E
+			XOR A, 0x2E2E
+			IFE A, 0x2E ; decimal point
                 JMP ROMBD41
             IFN A, 0x45 ; E
                 JMP ROMBD47
@@ -3728,11 +3732,11 @@
             JSR CHRGET
             IFE C, 0  ; is a digit
                 JMP ROMBD91
-            IFE A, 0xAB  ; minus code
+            IFE A, BASIC_MINUS_TOKEN
                 JMP ROMBD2E
             IFE A, 0x2D  ; minus
                 JMP ROMBD2E
-            IFE A, 0xAA  ; plus code
+            IFE A, BASIC_PLUS_TOKEN
                 JMP ROMBD30
             IFE A, 0x2B  ; plus
                 JMP ROMBD30
@@ -3747,11 +3751,11 @@
                 JMP ROMBD47
             SET A, 0
 :ROMBD3B    SUB A, [RAM5E]
-            JMP ROMBD49
+            JMP ROMBD49 ; subtract DECEXP and use.
             ; handle decimal point
-:ROMBD41    SHR [RAM5F], 1
-            BOR [RAM5F], 0x8000 
-            IFC [RAM5F], 0x4000 ; BVC
+:ROMBD41    SHR [DECFLG], 1       ; move existing decimal point flag
+            BOR [DECFLG], 0x8000  ; set decimal point flag
+            IFC [DECFLG], 0x4000 ; if decimal point flag already set
                 JMP ROMBD0A ; ignore second decimal
             ; Normalize number with E+xx/E-xx notation.
             ; 
@@ -3776,14 +3780,18 @@
                 JMP NEGOP ; originally via BD67
             RTS
 ; handle a digit
-:ROMBD6A    SET PUSH, A
-            IFB [RAM5F], 0x8000 ; after a decimal point
+:ROMBD6A    IFE A, 0x2E    ; decimal point, should not be here.
+				JMP CRASH
+			SET PUSH, A
+            IFB [DECFLG], 0x8000 ; after a decimal point
                 ADD [DECEXP], 1 ; increase decimal exponent
             JSR MUL10  ; multiply decimal mantissa regardless
             SET A, POP
             SUB A, 0x30 ; zero
             JSR FINLOG  ; add contents of digit
             JMP ROMBD0A ; go to next character
+
+:DERP DAT 0
 
             
 ; Add signed integer from A to float accu
@@ -3792,6 +3800,7 @@
             JSR MOVAF ; ARG = FAC
             SET A, POP
             JSR ROMBC3C  ; move A into FAC
+			
             SET A, [ARGSGN]
             XOR A, [FACSGN]
             ASR A, 15
@@ -4089,3 +4098,20 @@
                 RTS
             SET A, X
             RTS
+
+:XFACCRASH  SET I, [X+1]
+            SET J, [X+2]
+            SET EX, [X]
+            SET Z, [X+3]
+            JMP CRASH
+:FACCRASH   SET B, [ARGHO]
+			SET C, [ARGHO+1]
+			SET X, [ARGEXP]
+			SET A, [ARGSGN]
+			SET Y, [ARISGN]
+			SET I, [FACHO]
+            SET J, [FACHO+1]
+            SET EX, [FACEXP]
+            SET Z, [FACSGN]
+            BOR 0xBCBC, 0xBCBC
+            JMP CRASH
