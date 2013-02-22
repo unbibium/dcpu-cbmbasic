@@ -15,6 +15,9 @@
 ; set this to 11 to get a peek at whatever blocks of
 ; memory I was trying to examine last time I worked on this
 .DEFINE HW_ROWS 12
+; probably can't be changed, but if fancy hardware support
+; ever comes out...
+.DEFINE HW_COLS 32
 
 ; determines the amount of memory to set aside
 ; for parsing typed lines of BASIC.
@@ -29,21 +32,18 @@
 
 .DEFINE KEYBOARD_BUFFER_SIZE 80
 
+; set this to 1 to enable more specific messages
+; before ?SYNTAX  ERROR.
+.DEFINE DEBUG_SNERR 0
+
 ; you can define an automatic test program here
 ; as long as it's smaller than the keyboard buffer above
-; terminate in 0.
+; terminate in 0.  Lowercase characters will be printed
+; as shifted characters, so you can abbreviate commands.
 :BASIC_TEST_STRING
+    ;DAT "?ABS(2)",13,0
 	DAT 0
-    DAT "10 G", 79+128, "30"
-    dat 13
-    dat "30 ?3"
-    dat 13
-    dat "20 ?2"
-    dat 13
-    dat "RUN"
-    dat 13
-    DAT 0,0
-
+	
 :RUN_TEST_STRING
     SET I, BASIC_TEST_STRING
     SET J, KEYD

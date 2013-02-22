@@ -199,8 +199,9 @@
 .DEFINE BASIC_NOT_TOKEN 0xA8
 .DEFINE BASIC_EQ_TOKEN 0xB2
 .DEFINE BASIC_LEFT_TOKEN 0xC8
-.DEFINE BASIC_SGN_TOKEN 0xB3
-
+.DEFINE BASIC_SGN_TOKEN 0xB4
+.DEFINE BASIC_MINUS_TOKEN 0xAB
+.DEFINE BASIC_PLUS_TOKEN 0xAA
 
 
 
@@ -252,7 +253,7 @@
             DAT INT     ; int
             DAT ROMBC58 ; abs
             DAT 0x0310  ; usr
-            DAT 0xB37D  ; fre
+            DAT ROMB37D  ; fre
             DAT ROMB39E  ; pos
             DAT 0xBF71  ; sqr
             DAT 0xE097  ; rnd
@@ -270,7 +271,7 @@
             DAT CHRD
             DAT LEFTD
             DAT RIGHTD
-            DAT 0xB737
+            DAT MIDD
 
 ; indexing offset
 .DEFINE FUNCTION_VECTOR FUNCTION_ROUTINES-BASIC_SGN_TOKEN
@@ -1000,20 +1001,19 @@
             SET [RAM7A], A
             RTS
 
-
 :STMT_LIST
 :ROMA69C    IFE C, 0     ; LIST line
                 JMP ROMA6A4
             IFE Z, 1    ; LIST all
                 JMP ROMA6A4
-            IFN A, 0xAB ; LIST -end
+            IFN A, BASIC_MINUS_TOKEN ; LIST -end
                 RTS
 :ROMA6A4    JSR LINGET
             JSR FINDLN ; 
             JSR CHRGOT
             IFE Z, 1  ; no end line specified
                 JMP ROMA6BB
-            IFN A, 0xAB  ; range to end
+            IFN A, BASIC_MINUS_TOKEN  ; range to end
                 RTS
             JSR CHRGET
             JSR LINGET
@@ -1475,7 +1475,13 @@
 
 :STMT_ON
 :ROMA94B    JSR ROMB79E  ; Get result of expression after ON
-            SET PUSH, A  ; cache token following ON
+			;DEBUG CITY USA
+			SET PUSH, [RAM64]
+			SET PUSH, A
+			JSR LINPRT
+			SET A, POP
+			SET [RAM64], POP
+            SET PUSH, A  ; cache token following the expression
             IFE A, BASIC_GOSUB_TOKEN
                 JMP ROMA957
 :ROMA953    IFN A, BASIC_GOTO_TOKEN
@@ -1560,7 +1566,7 @@
                 JMP ROMAAE8
             IFE A, 0x3B ; SEMICOLON
                 JMP ROMAB13
-            JSR SP_GUARD_FRMEVAL
+            JSR FRMEVAL
             IFB [VALTYP], 0x80 ; string
                 JMP ROMAA9A    ; print string and restart
             JSR FOUT    ; convert float to string
@@ -1678,7 +1684,7 @@
                 SET Z, 1
 :ROMAB4C    RTS
 
-; Rread errors
+; Read errors
 
 :DOAGIN
 :ROMAB4D    SET A, [INPFLG]
@@ -2006,7 +2012,7 @@
             SHL A, 1
             BOR A, C
 :ROMAE08    SUB [RAM7A], 1
-            SET Y, 28   ; was 27 bytes, now 18 words 
+            SET Y, 18   ; was 27 bytes, now 18 words 
             SET [OPMASK], A  ; ?
             JMP ROMADF0
 :ROMAE19    IFL A, [TBL_OP+Y]
@@ -2083,15 +2089,17 @@
             JSR MOVFM
             JMP CHRGET
 :PIVAL      DAT 0x82, 0x490F, 0xDAA1  ; float value of PI
+			; not a digit, variable, or pi:
 :ROMAEAD    SET C, 0
             IFE A, 0x2E ; Decimal point
                 JMP FIN ; read a number
-            IFE A, 0xAB ; plus code
+            IFE A, BASIC_MINUS_TOKEN
                 JMP ROMAF0D
-            IFE A, 0xAA ; times code
+            IFE A, BASIC_PLUS_TOKEN
                 JMP ROMAE8A
             IFN A, CBM_QUOTE ; quote mark
                 JMP ROMAECC
+        	SET C, 0
             IFG A, CBM_QUOTE-1 ; carry over from 6502 CMP above
                 SET C, 1 
 ; remember to set carry bit before jumping here.
@@ -2101,10 +2109,10 @@
             JSR STRLIT
             JMP ROMB7E2  ; move RAM7A cursor to AFTER string
              ; and return.
-
+			;not a digit, variable, pi, string, or */-
 :ROMAECC    IFN A, BASIC_NOT_TOKEN
                 JMP ROMAEE3
-            SET Y, 16 ; vector into TBL_OP
+            SET Y, 12 ; vector into TBL_OP
                 JMP ROMAF0F
 
 ; NOT operator
@@ -2119,7 +2127,7 @@
 :ROMAEE3    IFE A, BASIC_FN_TOKEN ; FN
                 JMP FNDOER
 :ROMAEEA    IFG A, 0xB3 ; Token for a function or operator 
-                JMP ROMAFA7
+                JMP ISFUN
 :PARCHK
 :ROMAEF1    JSR CHKOPN
             JSR FRMEVAL
@@ -2142,15 +2150,42 @@
             IFE [Y], A
                 JMP CHRGET
 :SNERR ; ?SYNTAX  ERROR
-:ROMAF08    SET [CURLIN], A ; Temporary for debugging parser
-            SET X, 0x0B ; 
+:ROMAF08    IFE DEBUG_SNERR, 1
+				JSR PRINT_EXPECTED
+			SET X, 0x0B ; 
             JMP ERROR
+
+:SN_EXPECTED	DAT 0
+:SN_GOT  		DAT 0
+; new feature: prints the character it was expecting
+:PRINT_EXPECTED
+		SET [SN_EXPECTED], A
+		SET [SN_GOT], [Y]
+		SET A, EXPECTED_MSG
+		JSR STROUT
+		SET A, [SN_EXPECTED]
+		JSR CHROUT
+		SET A, GOT_MSG
+		JSR STROUT
+		SET A, [SN_GOT]
+		IFE A, 0
+			JMP SN_GOT_NULL
+		JMP CHROUT
+:SN_GOT_NULL
+		SET A, NULL_MSG
+		JMP STROUT
+				
+:EXPECTED_MSG
+	DAT 13,"EXPECTED ", 0
+:GOT_MSG
+	DAT ", GOT ", 0
+:NULL_MSG
+	DAT "NULL", 0
 
 ; RECURSIVE get value
 
 :ROMAF0D    SET Y, 14 ; vector into TBL_OP
 :ROMAF0F    SET A, POP ; WHY 2?
-            SET A, POP
             JMP ROMADFA
 
 ; Check variable pointer range
@@ -2220,7 +2255,7 @@
             SET X, POP
             SET PUSH, [RAM64]
             SET PUSH, X
-            JSR ROMB79E  ; get byte
+            JSR ROMB79E  ; get small integer
             SET Y, POP
             SET A, X
             SET PUSH, A
@@ -2228,6 +2263,9 @@
             ; handle single-argument functions
 :ROMAFD1    JSR PARCHK ; evaluate between parens
             SET Y, POP
+			SET A, Y ; DEBUG
+			SET B, FUNCTION_VECTOR ; DEBUG
+			SET C, FUNCTION_ROUTINES
 :ROMAFD6    ADD Y, FUNCTION_VECTOR
 			JSR [Y]
 			JMP ROMAD8D ; check return is numeric
@@ -2273,7 +2311,7 @@
 			JSR FCOMP
 			SET X, A
 			JMP ROMB061
-:ROMB02E	SET [RAM0D], 0
+:ROMB02E	SET [VALTYP], 0 ; numeric
 			SUB [RAM4D], 1
 			JSR ROMB6A6  ; get string length and address
 			SET [RAM61], A
@@ -2474,6 +2512,22 @@
 :ROMB2EA    SET EX, 0xB2EA
             JMP CRASH
 
+; fre(0)
+:ROMB37D	IFN [VALTYP], 0
+				JSR ROMB6A6  
+			JSR ROMB526
+			SET A, [RAM33]
+			SUB A, [RAM31]
+			; fall through to GIVAYF
+			; TODO: make it unsigned.
+			; the answer may be >32768.
+
+:GIVAYF ;Convert 16-Bit Signed Integer to Floating Point
+:ROMB391    SET [VALTYP], 0   ; numeric
+            SET [FACHO], A
+            SET X, 0x90
+            JMP ROMBC44 ; normalize
+            
 
 ; throw ?ILLEGAL DIRECT if not in direct mode
 :ERRDIR
@@ -2484,19 +2538,13 @@
 :ROMB3AE    SET X, 0x1B ; UNDEF'D FUNCTION
                 JMP ERROR
 
-:GIVAYF ;Convert 16-Bit Signed Integer to Floating Point
-:ROMB391    SET [VALTYP], 0   ; numeric
-            SET [FACHO], A
-            SET X, 0x90
-            JMP ROMBC44
-            
             
 ; get function name
 :ROMB3E1    SET A, BASIC_FN_TOKEN ;FN
             JSR SYNCHR
             XOR A, 0x80
             SET [RAM10], A
-            JSR ROMB092
+            JSR ROMB092 ; within PTRGET.
             SET [DEFPNT], A
             JMP ROMAD8D ; check that term is numeric
             
@@ -2891,9 +2939,16 @@
 :ROMB700
 :RIGHTD
 :ROMB72D
+:MIDD
+:ROMB737
             RTS
 
-; LEN function
+:ROMB39E	SET C, 1
+			JSR PLOT
+:ROMB3A2	SET A, 0
+			JMP GIVAYF
+
+; LEN function - valtyp should be String.
 :ROMB77C	JSR ROMB782
 			JMP ROMB3A2
 :ROMB782	JSR ROMB6A3  ; get length in A
@@ -2901,20 +2956,32 @@
 			SET Y, A     
 			RTS
 
-:ROMB39E	SET C, 1
-			JSR PLOT
-:ROMB3A2	SET A, 0
-			JMP GIVAYF
-
 ; get an integer that fits into a byte
 :GETBYTC
 :ROMB79B    JSR CHRGET
-:ROMB79E    JSR FRMNUM
-:ROMB7A1    JSR ROMB1B8
+:ROMB79E    JSR FRMNUM  ; get formula in FAC
+:ROMB7A1    JSR ROMB1B8 ; convert to integer
             SET X, [RAM64]
-            ; TODO: determine why 64 and 65 were both checked
             JMP CHRGOT
 
+:VAL
+:ROMB7AD	JSR ROMB782
+			IFE A, 0
+				JMP ROMB7B5
+			JMP ROMB8F7 ; zero FACEXP and FACSGN
+:ROMB7B5	SET X, [RAM7A]
+			SET [RAM71], X
+			SET A, [INDEX]
+			SET [RAM7A], A
+			ADD X, A
+			; wait, did we just add two pointers?
+			; I need to examine what ROMB6A3 returns in [INDEX].
+			DAT 0x2000
+:ROMB7D7	JSR CHRGOT
+			JSR FIN
+			SET A, POP
+			SET [J], 0
+			; move BASIC text cursor to end of string.
 :ROMB7E2    SET [RAM7A], [RAM71]
             RTS
 
@@ -3494,7 +3561,7 @@
 :ROMBC39
         JSR SIGN
 
-; Move signed number from A into float
+; Move signed 8-bit number from A into float
 
 :ROMBC3C
         SHL A, 8
@@ -3524,7 +3591,7 @@
 
 ; ABS FUNCTION
 :ROMBC58
-        SHR [FACSGN], 1
+        SET [FACSGN], 0
         RTS
             
 
