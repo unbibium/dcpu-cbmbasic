@@ -3286,33 +3286,27 @@
             SET A, [FACHO+1]
             JSR ROMBA59  
             SET A, [FACHO]
-            JSR ROMBA5E
+            JSR ROMBA59
             JMP ROMBB8F  ; ???
 
-            ; BIT-SHIFT ADDER
-:ROMBA59    IFE A, 0
-                JMP ROMB983
-:ROMBA5E    SHR A, 1
-            BOR A, 0x8000
-:ROMBA61    SET Y, A
-            IFE EX, 0
-                JMP ROMBA7D
-            ADD [RESHO+1], [ARGHO+1]
-            ADX [RESHO], [ARGHO]
-:ROMBA7D    SET C, EX
-            SHR [RESHO], 1
-            BOR [RESHO], C
-            SET C, EX
-            SHR [RESHO+1], 1
-            BOR [RESHO+1], C
-            SET C, EX
-            SHR [FACOV]
-            BOR [FACOV], C
-            SET A, Y
-            SHR A, 1
-            IFN A, 0
-            JMP ROMBA61
-:ROMBA8B    RTS
+            ; BYTE-SHIFT ADDER
+:ROMBA59    SET [FACOV], [RESHO+1]
+			SET [RESHO+1], [RESHO]
+			SET [RESHO], 0
+			SET Y, A
+			MUL Y, [ARGHO]
+			SET X, EX
+			ADD [RESHO+1], Y
+			ADX [RESHO], X
+			SET Y, A
+			MUL Y, [ARGHO+1]
+			SET X, EX
+			ADD [FACOV], Y
+			ADX [RESHO+1], X
+			ADX [RESHO], 0
+			IFN EX, 0 ; should be impossible
+				JMP FACCRASH ;unless i'm very wrong
+			RTS
 
 ; move float indexed by AY into second float accu
 ; return FAC1's exponent in A to enable special
@@ -3386,13 +3380,28 @@
                 JMP OVERR
             RTS
 
+; division doesn't work yet, so I'm going to
+; multiply by 0.1 instead
+:DIV10
+    JSR MOVAF  ; ARG = FAC
+	SET [FACHO], 0xCCCC
+	SET [FACHO+1], 0xCCCC
+	SET [FACOV], 0xCCCD
+	SET A, 0x7D
+	SET [FACEXP], A
+	SET [FACSGN], 0
+	SET [ARISGN], 0
+	JMP FMULTT
+	;JMP FACCRASH
+	
+
 ; FP constant TEN for division
 ; (there's no shortcut trick like in multiplying)
 :TENC
 :ROMBAF9
         DAT 0x84, 0x2000, 0x0000
 
-:DIV10
+:REALDIV10
 :ROMBAFE
         JSR MOVAF  ; ARG = FAC
         SET A, TENC
@@ -3400,6 +3409,8 @@
         SET [ARISGN], X
         JSR MOVFM  ; FAC1 = 10
         JMP FDIVT ; return 10/FAC?
+
+; FAC <- ARG / FAC
 :FDIV
 :ROMBB0F    JSR CONUPK ; copy to ARG; should return exp in A
 :FDIVT
