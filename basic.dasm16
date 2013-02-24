@@ -2925,14 +2925,13 @@
             SET Y, 0
             RTS
 :CHRD
-:ROMB6EC    JSR ROMB7A1
-            SET A, X
-            SET PUSH, A
+:ROMB6EC    JSR ROMB7A1  ; get byte operand
+            SET PUSH, X  ; push byte result
             SET A, 1
-            JSR ROMB47D
+            JSR ROMB47D   ; create a string 
             SET A, POP
-            SET [FACHO], A
-            SET A, POP
+            SET Y, [FACHO]
+            SET [Y], A
             SET A, POP
             JMP ROMB4CA ; save descriptor in $61 on stack
 :LEFTD
