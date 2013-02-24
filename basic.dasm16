@@ -2471,8 +2471,7 @@
                 JMP FCERR
 ; convert float to integer
 :AYINT
-:ROMB1BF    SET A, [FACEXP]
-            IFL A, 0x90
+:ROMB1BF    IFL [FACEXP], 0x90
                 JMP QINT
             SET A, N32768 ; -32768
             JSR FCOMP
@@ -2926,7 +2925,7 @@
             RTS
 :CHRD
 :ROMB6EC    JSR ROMB7A1  ; get byte operand
-            SET PUSH, X  ; push byte result
+			SET PUSH, X  ; push byte result
             SET A, 1
             JSR ROMB47D   ; create a string 
             SET A, POP
@@ -3679,7 +3678,7 @@
             IFG A, 0xF8   ; CMP 0xF9
                 JMP ROMBCBB
             JSR SHIFT_RIGHT  ; MULSHF offset
-            SET [BITS], Y
+            SET [BITS], 0
 :ROMBCBA    RTS
             
 :ROMBCBB    SET Y, A
@@ -3688,20 +3687,21 @@
             SHR [FACHO], 1
             BOR [FACHO], A
             JSR ROMB9B0 ; shift rest of FACHO to the right
-            SET [BITS], Y
-            ; investigate loss of precision:
-            ; 
+            SET [BITS], 0
 :ROMBCCB    RTS
 
 :INT
 :ROMBCCC    IFG [FACEXP], 0xA0  ; too big to have decimal places
                 RTS
             JSR QINT
-            SET [FACOV], Y
-            SET A, [FACSGN]
-            SET [FACSGN], Y
-            ;EOR #$80
-            ;ROL
+            SET [FACOV], 0
+            SET EX, 0
+			IFU [FACSGN], 1
+				SET EX, -1
+            SET [FACSGN], 0
+            SET [FACEXP], 0xA0
+            SET [RAM07], [RAM64]
+            JMP ROMB8D2 ; re-normalize
             
                 
 :ROMBCE9    SET [FACHO], 0
