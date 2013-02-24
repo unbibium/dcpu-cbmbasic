@@ -3417,12 +3417,13 @@
 :ROMBB12    IFE A, 0  ; dividing by 0?
                 JMP ROMBB8A ; oh shi--
             JSR ROUND
-:ROMBB21    SET A, 0
+            SET A, 0
 			SUB A, [FACEXP]
             AND A, 0xFF
             SET [FACEXP], A
             JSR MULDIV ; add exponents
-            ADD [FACEXP], 1
+            ; works fine up to here
+:ROMBB21    ADD [FACEXP], 1
             IFB [FACEXP], 0x100
                 JMP OVERR
 :ROMBB25    SET X, RESHO-1
@@ -3444,10 +3445,11 @@
             SET C, EX ; store carry bit off left side of A
             IFE PEEK, 0
                 BOR A, 1 ; carry-add part of ROL
-            IFN C, 0 ; off left side
+            IFE C, 0 ; no bit fell off off left side
                 JMP ROMBB4C
-			; we have enoiugh bits in A to store a byte
-			; into RESHO now.
+            ; the 1 that is in C is the guard bit we initially
+            ; set in A. this means we have enoiugh bits in A
+            ; to store a byte into RESHO now.
             ADD X, 1  
             SET [X], A
             IFE X, RESHO+1
@@ -3482,7 +3484,7 @@
             JMP ERROR
 :ROMBB8F    SET [FACHO], [RESHO]
             SET [FACHO+1], [RESHO+1]
-            JMP ROMB8D7
+            JMP ROMB8D7 ; normalize before returning
             
 	
 
