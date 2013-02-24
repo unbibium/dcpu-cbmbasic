@@ -107,7 +107,7 @@
 :RAM5C  DAT 0, 0, 0
 :RAM5D 
 :DECEXP DAT 0 ; decimal exponent during FIN/FOUT
-:RAM5E  DAT 0 ; binary exponent maybe?
+:RAM5E  DAT 0 ; Number of digits during FIN?
 :RAM5F  DAT 0 ; ...
 :RAM60  DAT 0 ; sign of exponent operator in FIN
 :FAC1    ; Floating Point Accumulato0r 
@@ -3408,7 +3408,7 @@
         SET X, 0
         SET [ARISGN], X
         JSR MOVFM  ; FAC1 = 10
-        JMP FDIVT ; return 10/FAC?
+        JMP FDIVT ; return FAC/10
 
 ; FAC <- ARG / FAC
 :FDIV
@@ -3733,9 +3733,7 @@
             ; parse a digit
 :ROMBD0D    IFE C, 0    ; is a digit
                 JMP ROMBD6A
-:ROMBD0F    XOR A, 0x2E2E
-			XOR A, 0x2E2E
-			IFE A, 0x2E ; decimal point
+:ROMBD0F    IFE A, 0x2E ; decimal point
                 JMP ROMBD41
             IFN A, 0x45 ; E
                 JMP ROMBD47
@@ -3753,15 +3751,14 @@
                 JMP ROMBD30
             JMP ROMBD35
             ; handle negative exponent
-:ROMBD2E    SHR [RAM60], 1
-            BOR [RAM60], 0x8000
+:ROMBD2E    SET [RAM60], -1
 :ROMBD30    JSR CHRGET
             IFE C, 0 ; is a digit?
                 JMP ROMBD91
-:ROMBD35    IFC [RAM60], 0x8000 ; bpl
+:ROMBD35    IFN [RAM60], -1 ; bpl
                 JMP ROMBD47
             SET A, 0
-:ROMBD3B    SUB A, [RAM5E]
+            SUB A, [RAM5E]
             JMP ROMBD49 ; subtract DECEXP and use.
             ; handle decimal point
 :ROMBD41    SHR [DECFLG], 1       ; move existing decimal point flag
@@ -3769,17 +3766,19 @@
             IFC [DECFLG], 0x4000 ; if decimal point flag already set
                 JMP ROMBD0A ; ignore second decimal
             ; Normalize number with E+xx/E-xx notation.
-            ; 
 :ROMBD47    SET A, [RAM5E]   
 :ROMBD49    SUB A, [DECEXP]
             SET [RAM5E], A
-:ROMBD4E    IFE A, 0
-                JMP ROMBD62
-            IFC A, 0x8000 ; BPL
+            IFE A, 0
+                JMP ROMBD62 ; no decimal point
+            IFA A, -1 ; BPL
                 JMP ROMBD5B
+            ; Decimally denormalize number.
+            ; RAM5E is the decimal exponent
+            ; DECEXP is the number of digits to the right 
 :ROMBD52    JSR DIV10
             ADD [RAM5E], 1
-            IFE [RAM5E], 0
+            IFN [RAM5E], 0
                 JMP ROMBD52
             JMP ROMBD62
 :ROMBD5B    JSR MUL10
@@ -3829,10 +3828,13 @@
             JMP OVERR ; ?OVERFLOW ERROR
             ; i think this handles E+XX
 :ROMBDA0    MUL A, 10
+            AND A, 0xFF ; simulate some 8-bit quirk
             SET Y, [RAM7A]
             ADD A, [Y]
             SUB A, 0x30 ; un-digit
-:ROMBDAE    SET [RAM5E], A
+:ROMBDAE    SHL A, 8 ; 8-bit quirk simulation
+			ASR A, 8 ; continues
+			SET [RAM5E], A
             JMP ROMBD30 ; get next expodigit
             
 :NO999
