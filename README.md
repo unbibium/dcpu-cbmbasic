@@ -84,3 +84,8 @@ how thoroughly useful it becomes.  The floating point routines can
 probably be separated, and the BASIC can certainly be separated
 from the KERNAL.
 
+Another promising interpreter for the DCPU-16 is dcpu-admiral,
+which aims to be more Python-like:
+* <https://github.com/r4d2/dcpu-admiral>
+
+
