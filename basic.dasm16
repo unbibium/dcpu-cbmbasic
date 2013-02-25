@@ -132,7 +132,8 @@
 :RAM69   ; Exponent (only 8 bits used)
 :ARGEXP DAT 0
 :RAM6A   ; Mantissa (32-bit)
-:ARGHO  DAT 0, 0
+:ARGHO  DAT 0
+:RAM6C  DAT 0
 :ARGOV
 :RAM56  DAT 0
 :ARGSGN
@@ -302,7 +303,7 @@
         DAT 0x5A
         DAT NOTOP   ; NOT
         DAT 0x64
-        DAT 0xB015   ; greater / equal / less
+        DAT ROMB016   ; greater / equal / less
 
 
 ; table of commands
@@ -2045,6 +2046,7 @@
             SET PUSH, A
             JMP I    ; instead of RTS
 
+; apply comparison operator
 ; Pop ARG from stack (4 WORDS)
 :ROMAE58    SET Y, -1
             SET A, POP
@@ -2057,7 +2059,7 @@
 :ROMAE64    SET [OPPTR], Y
 :ROMAE66    SET A, POP
             SHR A, 1
-            SET [RAM12], A
+            SET [RAM12], A ; 
             SET [ARGEXP], POP 
             SET [ARGHO], POP 
             SET [ARGHO+1], POP 
@@ -2298,10 +2300,10 @@
             ; STA $62
             RTS
 
-; comparison operators
+; comparison operators...
 
-:ROMB016	JSR ROMAD90
-			IFE C, 1
+:ROMB016	JSR ROMAD90 ; makesure VALTYP matches C.
+			IFE C, 1   ; string
 				JMP ROMB02E
 			SET A, [ARGSGN]
 			BOR A, 0x7FFF
@@ -2311,18 +2313,53 @@
 			JSR FCOMP
 			SET X, A
 			JMP ROMB061
-:ROMB02E	SET [VALTYP], 0 ; numeric
+			; string compare
+:ROMB02E	SET [VALTYP], 0 ; result is numeric
 			SUB [RAM4D], 1
 			JSR ROMB6A6  ; get string length and address
 			SET [RAM61], A
 			SET [RAM62], X
-			DAT 0x5C00   ; will do string compares later
-:ROMB061	IFB X, 0x8000
+			SET A, [ARGHO+1]
+:ROMB041	JSR ROMB6AA ; allocate string memory
+			SET [RAM6C], X ; store string address
+			SET X, A
+			SUB A, [RAM61]
+			IFE A, 0
+				JMP ROMB056
+			SET A, 1
+			IFE EX, -1
+				JMP ROMB056
+:ROMB056	SET [FACSGN], A
+			SET I, [ARGHO+1]
+			SET J, [RAM62]
+:ROMB05B	ADD X, 1
+			ADD I, 1 ; INY to two vectors
+			ADD J, I
+			SUB X, 1
+			IFN X, 0
+				JMP ROMB066
+			SET X, [FACSGN]
+:ROMB061	SET I, [ARGHO+1]  ; ($6C),Y
+			SET J, [RAM62]  ; ($62),Y
+			IFB X, 0x8000
 				JMP ROMB072
 			SET C, 0
 			JMP ROMB072
-:ROMB066	DAT 0x5400   ; should go to bed
-:ROMB072	DAT 0x5800
+:ROMB066	SET A, [I]
+			SUB A, [J]
+			IFE A, 0
+				JMP ROMB05B
+			SET X, -1
+			IFE EX, 0
+				SET X, 1
+:ROMB072	ADD X, 1
+			SET A, X
+			shl A, 1
+			AND A, [RAM12]   ; comparison
+			IFN A, 0
+				SET A, -1
+			JMP ROMBC3C
+			
 
 ;get name and pointer to a variable.
 ; At the end, the cursor should be at the last character of 
@@ -3588,7 +3625,7 @@
         ; used at BD02 to determine whether
         ; to call NEGFAC.
         SET EX, 0
-        IFB A, 0x8000
+        IFU A, 0
             SET EX, -1
 ; Zero out rest of FACHO
 :ROMBC49
