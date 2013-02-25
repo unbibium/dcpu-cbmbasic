@@ -131,15 +131,15 @@
 ; Notable differences include:
 ;    originally, GOSUB pushed 5 bytes on the stack; now it pushes 3.
 :STACK         
-              .FILL 256 0
+              .FILL 256 32
 :STACKBASEND
-                .FILL 6 0
+                .FILL 6 32
 :STACKEND
 
 
 :RAM0277    ;KEYBOARD BUFFER
 :KEYD
-    .FILL KEYBOARD_BUFFER_SIZE 0
+    .FILL KEYBOARD_BUFFER_SIZE 32
 
 :RAM01FB  DAT 0
 :RAM01FC  DAT 0
@@ -228,7 +228,7 @@
 
 
 :SCREENMEM    
-               .FILL HW_COLS*HW_ROWS 0x4400
+               .FILL HW_COLS*HW_ROWS BLANK
 :SCREENMEMEND
 ; when HW_ROWS < 12, the bottom line displays
 ; various debugging information.
@@ -237,15 +237,15 @@
 ; debug keyboard I/O
           DAT 0xA00B, 0xA03A ; "K:"
 :DEBUGKEY
-          .FILL 10 0x0
+          .FILL 10 BLANK
 ; debug line link tbl
         DAT 0xA00C, 0xA03A ; "L:" 
 :DEBUGLNK 
-        .FILL 14 0x0
+        .FILL 14 BLANK
 ; debug vblank interrupt
           DAT 0xA009, 0xA03A; "I:"
 :DEBUGINT
-          .FILL 6 0x0
+          .FILL 6 BLANK
 
           .FILL HW_COLS-29 0xA02E
 
@@ -1803,7 +1803,7 @@ RTS
     RTS
 
 :VISFONT    
-    .FILL 256 0
+    .FILL 256 BLANK
 :COMGFX
     DAT 0, 0  ; shift-space
     DAT 0xFFFF, 0x00 ; left block
@@ -1877,10 +1877,10 @@ RTS
     
 ; XOR masks to toggle uppercase-lowercase
 :FONTXOR1
-    .FILL 52 0
+    .FILL 52 BLANK
 ; XOR masks to toggle graphics-uppercase 
 :FONTXOR2
-    .FILL 52 0          
+    .FILL 52 BLANK
 
 ; Handle keyboard interrupts by storing keystrokes in
 ; special RAM locations, where they'll be picked up by 
@@ -1926,6 +1926,7 @@ RTS
     DAT 0xf80, 0x840, 0xf88, 0x444
     DAT 0x888, 0x8f8, 0x88f, 0xccc
 
+; jump points for if assertion fails
 :BASCRASH
     SET A, [TXTTAB+1]
     SET B, [TXTTAB+2]
@@ -1942,8 +1943,8 @@ RTS
     SET A, [VARTAB]
     SET B, [STREND]
     
-; jump here if assertion fails
 :CRASH DAT 0x3000
 
 :BASICMEM     
         .FILL 10 0 
+

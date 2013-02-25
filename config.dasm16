@@ -41,8 +41,13 @@
 ; terminate in 0.  Lowercase characters will be printed
 ; as shifted characters, so you can abbreviate commands.
 :BASIC_TEST_STRING
-    ;DAT "?ABS(2)",13,0
-	DAT 0
+    DAT "10FoX=1TO10STe3",13
+    DAT "20FoY=4TO1STe-1",13
+    DAT "30?X*Y;:NeY,X",13
+    DAT "15?",13
+    DAT "40?:Li",13
+    DAT "Ru",13,0
+
 	
 :RUN_TEST_STRING
     SET I, BASIC_TEST_STRING
@@ -54,4 +59,8 @@
     SUB J, KEYD
     SET [NDX], J
     RTS
+
+; if the target is a DAT dump where ASCII strings are allowed,
+; set this to 0x20 to compress into spaces. otherwise set it to 0
+.DEFINE BLANK 0x20
 
