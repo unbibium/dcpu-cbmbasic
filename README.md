@@ -64,11 +64,15 @@ but I haven't had time to investigate why yet.
 I've used the following online resources to make this work:
 
 * Mapping the C64 by Sheldon Leemon, Compute! Publications 1984
-   http://unusedino.de/ec64/technical/project64/mapping_c64.html
-* C64 ROM disassembly"annotated" -- there were no useful labels
+   <http://unusedino.de/ec64/technical/project64/mapping_c64.html>
+* C64 ROM disassembly "annotated" -- there were no useful labels
   but there were a few useful comments and the JMP and JSR statements
-  were linked.
-  URL forthcoming.
+  were linked.  (I had to save it offline for the links to work though.)
+  <http://www.ffd2.com/fridge/docs/c64-diss.html>
+* Create Your Own Version of Microsoft BASIC for 6502
+  This has some source code listings that explained things a little
+  more thoroughly.
+  <http://www.pagetable.com/?p=46>
 
 DISCLAIMER:
 
