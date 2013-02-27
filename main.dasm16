@@ -2,12 +2,10 @@
 ; by Nick Bensema
 
 
-; why aren't these standard?
-; these defines should work on most assemblers.
+; I'll petition Notch to make these mnemonics standard
+; once I have all my ducks in a row.
 .DEFINE JMP SET PC,
 .DEFINE RTS SET PC, POP
-
-.DEFINE TOKEN_NAMES_1 TOKEN_NAMES-1
 
 JMP [ROMFFFC]   ; RESET vector
 
