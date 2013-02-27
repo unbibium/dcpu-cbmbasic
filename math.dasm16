@@ -434,15 +434,17 @@
 ; division doesn't work yet, so I'm going to
 ; multiply by 0.1 instead
 :DIV10
-    JSR MOVAF  ; ARG = FAC
-	SET [FACHO], 0xCCCC
-	SET [FACHO+1], 0xCCCC
-	SET [FACOV], 0xCCCD
-	SET A, 0x7D
-	SET [FACEXP], A
-	SET [FACSGN], 0
-	SET [ARISGN], 0
-	JMP FMULTT
+        SUB [FACEXP], 1 ; * 0.5
+:DIV5
+        JSR MOVAF  ; ARG = FAC
+        SET [FACHO], 0xCCCC
+        SET [FACHO+1], 0xCCCC
+        SET [FACOV], 0xCCCD
+        SET A, 0x7E 
+        SET [FACEXP], A
+        SET [FACSGN], 0
+        SET [ARISGN], 0
+        JMP FMULTT
 	;JMP FACCRASH
 	
 
@@ -477,16 +479,48 @@
             ADD [FACEXP], 1
             IFC [FACEXP], 0xFF
                 JMP OVERR
-            ; if divisor's mantissa is 1.0, 
+            ; special case
+            SET X, [FACHO]
+            SET Y, [ARGHO] ; if divisor's mantissa is 1.0, 
             ; copy ARG's mantissa and return
-            IFE [FACHO], 0x8000
+            IFE X, 0x8000
                 IFE [FACHO+1], 0
                     JMP MOVFAHO
             ; if dividend and divisor have same mantissa,
             ; set result's mantissa to 1.0 and return
-            IFE [FACHO], [ARGHO]
+            IFE X, Y
                 IFE [FACHO+1], [ARGHO+1]
                     JMP MOV1HO
+            ; all others, do a 16-bit integer divide.
+            ; this will hold us over until we can do this
+            ; properly.
+            SET [FACOV], 0
+            DIV Y, X
+            SET X, EX
+            IFE Y, 0
+               JMP FDIVR0
+:FDIVR1
+            ; result is 1.x - shift and store 17 bits
+            SHR X, 1
+            SET [FACHO+1], EX
+            BOR X, 0x8000
+            SET [FACHO], X
+            RTS
+            ; result is 0.x - normalize before storing
+            ; but increase exponent to compensate.
+:FDIVR0A
+            SHL X, 1        ; * 2
+:FDIVR0
+            SUB [FACEXP], 1 ; / 2
+            IFC X, 0x8000
+                JMP FDIVR0A
+            SET [FACHO], X
+            SET [FACHO+1], 0
+            RTS
+
+            ; here's the original division routine, it started
+            ; where the special case section is now.
+            ; it was close to working
             SET X, RESHO-1 ; pointer, will be incremented before storage
             SET A, 1 ; "stop" bit -- when this 1 goes off the
                      ; left side of A, we store the byte to [X+1].
