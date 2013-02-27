@@ -258,6 +258,7 @@
 :TBL_OP_NOT
         DAT 0x5A
         DAT NOTOP   ; NOT
+:TBL_OP_COMPARE
         DAT 0x64
         DAT ROMB016   ; greater / equal / less
 
@@ -874,7 +875,7 @@
             ADD [COUNT], 1
             ; Skip past end of this token
 :ROMA5F9    ADD Y, 1
-:ROMA5FA    IFC [TOKEN_NAMES_1+Y], 0x80
+:ROMA5FA    IFC [TOKEN_NAMES-1+Y], 0x80
                 JMP ROMA5F9
             IFN [TOKEN_NAMES+Y], 0
                 JMP ROMA5B8 ; Try next token
@@ -1027,7 +1028,7 @@
             ; token value detected
 :ROMA724    SUB A, 0x7F
             SET [RAM49], Y
-            SET Y, TOKEN_NAMES_1
+            SET Y, TOKEN_NAMES-1
 :ROMA72C    SUB A, 1 ; Next token
             IFE A, 0
                 JMP ROMA737
@@ -1864,21 +1865,21 @@
 :FRMNUM
 :ROMAD8A    JSR FRMEVAL
 ; check value to be numeric
-:ROMAD8D    IFB [VALTYP], 0x8000
+:ROMAD8D    IFU [VALTYP], 0
                 JMP ROMAD99
             RTS
 ; check value to be string
-:ROMAD8F    IFC [VALTYP], 0x8000
+:ROMAD8F    IFA [VALTYP], -1
                 JMP ROMAD99
             RTS
 ; this one will need a lot of testing
 ; check value according to C flag
-:ROMAD90    IFB [VALTYP], 0x8000
+:ROMAD90    IFU [VALTYP], -1
                 JMP ROMAD97
-            IFE C, 1
+            IFN C, 0
                 JMP ROMAD99
             RTS
-:ROMAD97    IFE C, 1
+:ROMAD97    IFN C, 0
                 RTS
 :ROMAD99    SET X, 0x16  ; ?TYPE MISMATCH ERROR
             JMP ERROR
@@ -1915,15 +1916,15 @@
             IFL A, 1         ;ROL
                 BOR A, 0x01  ;EOR #$01
             XOR A, [OPMASK]
-            IFL A, [OPMASK]
-                JMP SNERR
+            IFL A, [OPMASK]  ; can't use same symbol twice
+                JMP SNERR    ; in same operator.
             SET [OPMASK], A
             JSR CHRGET
             JMP ROMADBB  ; check for more comparison operators
             ; done detecting comparison operators
 :ROMADD7    IFN [OPMASK], 0  ; comparison operator exists
                 JMP ROMAE07
-            IFC A, 0xf000 ; result from SUB above was positive
+            IFA A, -1 ; result from SUB above was positive
                 JMP ROMAE58
             ADD A, 7  ; - 0xB1 + 7 = -0xAA
             IFU A, 0   ; still less than 0
@@ -1963,13 +1964,14 @@
 ; the first instruction here was LSR $0D, which I think was there
 ; to both set VALTYP to "numeric" for all future BMI tests, while
 ; getting its carry bit from the low bit.  I'll have to investigate.
-:ROMAE07    SHR [VALTYP], 1   
-            SET C, EX        
+:ROMAE07    SET C, [VALTYP]
+			SET [VALTYP], 0
             SET A, [OPMASK]
             SHL A, 1
+            AND C, 1
             BOR A, C
 :ROMAE08    SUB [RAM7A], 1
-            SET Y, 18   ; was 27 bytes, now 18 words 
+            SET Y, TBL_OP_COMPARE-TBL_OP   ; point to ROMB016 
             SET [OPMASK], A  ; ?
             JMP ROMADF0
 :ROMAE19    IFL A, [TBL_OP+Y]
@@ -1978,7 +1980,7 @@
             
 ; recursive entry for evaluation of expression
 :ROMAE20    
-            SET PUSH, [TBL_OP+1+Y]
+            SET PUSH, [TBL_OP+1+Y] ; push operator for RTS
             JSR ROMAE33  ; push FAC onto stack
             SET A, [OPMASK]
             ; X is set to the order of precedence of
@@ -2070,10 +2072,10 @@
 			;not a digit, variable, pi, string, or */-
 :ROMAECC    IFN A, BASIC_NOT_TOKEN
                 JMP ROMAEE3
-            SET Y, 12 ; vector into TBL_OP
-                JMP ROMAF0F
+            SET Y, TBL_OP_NOT-TBL_OP ; vector into TBL_OP
+            JMP ROMAF0F
 
-; NOT operator
+; NOT operator (actually XORs all bits)
 :NOTOP
 :ROMAED4    JSR AYINT 
             SET A, [FACHO+1]
@@ -2142,8 +2144,8 @@
 
 ; RECURSIVE get value
 
-:ROMAF0D    SET Y, 14 ; vector into TBL_OP
-:ROMAF0F    SET A, POP ; WHY 2?
+:ROMAF0D    SET Y, TBL_OP_NEG-TBL_OP ; vector into TBL_OP
+:ROMAF0F    SET A, POP  ; discard
             JMP ROMADFA
 
 ; Check variable pointer range
@@ -2241,9 +2243,9 @@
 			JSR MOVFA
 			JSR AYINT
 			SET A, [RAM64]
-			XOR [RAM0B]
-			AND [RAM07]
-			XOR [RAM0B]
+			XOR A, [RAM0B]
+			AND A, [RAM07]
+			XOR A, [RAM0B]
 			JMP GIVAYF
 				
 
@@ -2258,14 +2260,16 @@
 
 ; comparison operators...
 
-:ROMB016	JSR ROMAD90 ; makesure VALTYP matches C.
+:ROMB016	; C should be 1 if the other side was a
+            ; string expression, 0 otherwise.
+			JSR ROMAD90 ; make sure VALTYP matches C.
 			IFE C, 1   ; string
 				JMP ROMB02E
 			SET A, [ARGSGN]
 			BOR A, 0x7FFF
 			AND A, [ARGHO]
 			SET [ARGHO], A
-			SET A, ARGEXP
+			SET A, ARGEXP  ; pass pointer to FCOMP
 			JSR FCOMP
 			SET X, A
 			JMP ROMB061
