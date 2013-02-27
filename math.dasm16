@@ -424,6 +424,13 @@
                 JMP OVERR
             RTS
 
+; special case for division
+:MOV1HO
+    SET [FACHO], 0x8000
+    SET [FACHO+1], 0
+    SET [FACOV], 0
+    RTS
+
 ; division doesn't work yet, so I'm going to
 ; multiply by 0.1 instead
 :DIV10
@@ -467,10 +474,20 @@
             SET [FACEXP], A
             JSR MULDIV ; add exponents
             ; works fine up to here
-:ROMBB21    ADD [FACEXP], 1
-            IFB [FACEXP], 0x100
+            ADD [FACEXP], 1
+            IFC [FACEXP], 0xFF
                 JMP OVERR
-:ROMBB25    SET X, RESHO-1
+            ; if divisor's mantissa is 1.0, 
+            ; copy ARG's mantissa and return
+            IFE [FACHO], 0x8000
+                IFE [FACHO+1], 0
+                    JMP MOVFAHO
+            ; if dividend and divisor have same mantissa,
+            ; set result's mantissa to 1.0 and return
+            IFE [FACHO], [ARGHO]
+                IFE [FACHO+1], [ARGHO+1]
+                    JMP MOV1HO
+            SET X, RESHO-1 ; pointer, will be incremented before storage
             SET A, 1 ; "stop" bit -- when this 1 goes off the
                      ; left side of A, we store the byte to [X+1].
 :ROMBB29    SET Y, [ARGHO]
@@ -484,10 +501,10 @@
             ; resulted in an overflow
             ;DCPU: EX = -1 represents carry clear case
             ;      EX = 0 represents carry set case
-:ROMBB3F    SET PUSH, EX ; simulate PHP
+:ROMBB3F    SET B, EX ; simulate PHP
             SHL A, 1  ; shifting part of ROL
             SET C, EX ; store carry bit off left side of A
-            IFE PEEK, 0
+            IFE B, 0
                 BOR A, 1 ; carry-add part of ROL
             IFE C, 0 ; no bit fell off off left side
                 JMP ROMBB4C
@@ -496,14 +513,16 @@
             ; to store a byte into RESHO now.
             ADD X, 1  
             SET [X], A
-            IFE X, RESHO+1
-                JMP ROMBB7A
+:FDIVTEST   ;SET B, [FACEXP]
+			;DAT 0x5800
+			IFE X, RESHO+1
+                JMP ROMBB7A  ; just do two more bits
             IFG X, RESHO+1
-                JMP ROMBB7E  ; Store to [FACOV]
+                JMP ROMBB7E  ; Store last two bits in [FACOV]
             SET A, 1 ; "stop" bit of next byte
-:ROMBB4C    SET EX, POP
-:ROMBB4D    IFE EX, 0
-                JMP ROMBB5D
+:ROMBB4C    SET EX, B   ; pop ARGHO-FACHO compare again
+:ROMBB4D    IFE EX, 0     ; ARGHO >= FACHO
+                JMP ROMBB5D  ; Subtract FACHO from ARGHO
             ; subtract 1 at left of ARGHO and re-normalize.
 :ROMBB4F    SHL [ARGHO], 1
             SET C, EX
@@ -511,18 +530,18 @@
             BOR [ARGHO], EX
             IFN C, 0 ; bit fell off left side of mantissa
                 JMP ROMBB3F ; rotate A left too.
-            IFB [ARGHO], 0x8000  ; ARG is normalized
-                JMP ROMBB29 ; subtract again
+            IFN EX, 0 ; ARG is normalized
+                JMP ROMBB29 ; go to beginning of compare loop
             JMP ROMBB3F
             ; originally BB5D preserved  A. 
 :ROMBB5D    SUB [ARGHO+1], [FACHO+1]
             SBX [ARGHO], [FACHO]
             JMP ROMBB4F
-:ROMBB7A    SET A, 0x4000 
+:ROMBB7A    SET A, 0x4000 ; "stop" bit of FACOV
 			JMP ROMBB4C
 :ROMBB7E    SHL A, 14 ; originally 6
             SET [FACOV], A
-            SET EX, POP  ; PLP?
+            SET EX, B  ; PLP?
             JMP ROMBB8F
 :ROMBB8A    SET X, 0x14  ; OH SHI--
             JMP ERROR
@@ -569,9 +588,10 @@
 ; Move from FAC2 to FAC1
 :MOVFA
 :ROMBBFC    SET [FACSGN], [ARGSGN]
+            SET [FACEXP], [ARGEXP]
+:MOVFAHO
             SET [FACHO+1], [ARGHO+1]
             SET [FACHO], [ARGHO]
-            SET [FACEXP], [ARGEXP]
             SET [FACOV], 0
             RTS
 ; MOVE rounded FAC into ARG
@@ -716,7 +736,7 @@
                 JMP ROMBCE9 ; clear mantissa and return
 :ROMBC9F    SUB A, 0xA0
             AND A, 0xFF
-            IFC [FACSGN], 0x8000
+            IFA [FACSGN], -1
                 JMP ROMBCAF ; skip two lines if positive
             SET [BITS], -1  ; shift 1s from the left instead of 0s
             JSR ROMB94D  ; multiply mantissa by -1
