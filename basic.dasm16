@@ -2925,7 +2925,18 @@
             SET A, POP
             JMP ROMB4CA ; save descriptor in $61 on stack
 :LEFTD
-:ROMB700
+:ROMB700    JSR ROMB761
+			IFG A, [Y]  ; if parameter is longet than length
+			    SET A, [Y]
+:ROMB70C	SET PUSH, A
+			SET PUSH, Y
+			JSR ROMB47D   ; allocate number of bytes in A
+			SET A, [DSCPNT] ; get address
+			JSR ROMB6AA   ; Allocate string memory
+			SET Y, POP
+			SET A, POP
+			JSR ROMB68C ; move string with length A
+:ROMB729	JMP ROMB4CA
 :RIGHTD
 :ROMB72D
 :MIDD
@@ -2936,6 +2947,15 @@
 			JSR PLOT
 :ROMB3A2	SET A, 0
 			JMP GIVAYF
+
+; get first 2 parameters for LEFT$/RIGHT$/MID$
+:ROMB761	JSR CHKCLS
+			SET X, POP ; RTS address (was 2)
+			SET A, POP ; discard - was 2
+			SET A, POP ; first numeric parameter
+			SET Y, POP ; pointer to string descriptor
+			SET [DSCPNT], Y
+			JMP X
 
 ; LEN function - valtyp should be String.
 :ROMB77C	JSR ROMB782
