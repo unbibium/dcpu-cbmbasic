@@ -1433,13 +1433,7 @@
 
 :STMT_ON
 :ROMA94B    JSR ROMB79E  ; Get result of expression after ON
-			;DEBUG CITY USA
-			SET PUSH, [RAM64]
-			SET PUSH, A
-			JSR LINPRT
-			SET A, POP
-			SET [RAM64], POP
-            SET PUSH, A  ; cache token following the expression
+			SET PUSH, A  ; cache token following the expression
             IFE A, BASIC_GOSUB_TOKEN
                 JMP ROMA957
 :ROMA953    IFN A, BASIC_GOTO_TOKEN
