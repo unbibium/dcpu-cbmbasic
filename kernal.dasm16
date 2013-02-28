@@ -1346,11 +1346,12 @@ RTS
     set A, 0  ; set screen memory
     set B, SCREENMEM
     hwi [MONITOR]
-    set A, 3  ; set border
-    set B, 9  ; light blue
-    hwi [MONITOR]
 
     JSR MAKE_CBM_FONT
+    set A, 3  ; set border
+    set B, 0xE  ; light blue
+    hwi [MONITOR]
+
 :initialize_keyboard
     SET A, 3
     SET B, KEYINT
