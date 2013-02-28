@@ -145,7 +145,6 @@
 :ROMB8DA    SET C, 0
 :ROMB8DB    ; if highest 8 bits of mantissa are
             ; clear, we shift them left here.
-            ; probably a better way to do this in 16-bit
             IFB [FACHO], 0xFF00   ; any bits set
                 JMP ROMB929  ; skip to single-bit
 :ROMB8DF    SHL [FACHO], 8
@@ -182,8 +181,9 @@
             BOR [FACHO], EX
             SHL [FACOV], 1
             BOR [FACHO+1], EX
-:ROMB929    IFC [FACHO], 0x8000
+:ROMB929    IFC [FACHO], 0x8000   
                 JMP ROMB91D
+        	; mantissa is normalized
 :ROMB92B    SUB A, [FACEXP]
             AND A, 0xFF
 :ROMB92E    IFE EX, 0 ; no borrow involved
@@ -192,7 +192,8 @@
             ADD A, 1
             AND A, 0xFF
 :ROMB934    SET [FACEXP], A
-:ROMB936    IFC A, 0xFF00 ; this BCC is probably unconditional
+:ROMB936    
+			IFC A, 0xFF00 ; this BCC is probably unconditional
                 RTS
     ; Add 1 to exponent, and 
     ; shift manitssa to the right by 1.
@@ -259,7 +260,7 @@
 :ROMB99F    SUB A, 8  ; back to normal
             SET Y, A ; pass exponent to Y
 :ROMB9A2    SET A, [FACOV]  ;FAC overflow
-            IFC Y, 0x8000 ; SBC #8 resulted in carry set
+            IFC Y, 0x80 ; SBC #8 resulted in carry set
                 JMP ROMB9BA
             ; rotate first byte of mantissa?
             ; here we rotate 16 bits instead of 8
@@ -424,44 +425,57 @@
                 JMP OVERR
             RTS
 
-; special case for division
+; special case in FDIV, set result m=1
 :MOV1HO
     SET [FACHO], 0x8000
     SET [FACHO+1], 0
     SET [FACOV], 0
     RTS
 
-; division doesn't work yet, so I'm going to
-; multiply by 0.1 instead
+; reciprocal multiplier for 1/10 for parsing float literals
 :DIV10
-        SUB [FACEXP], 1 ; * 0.5
-:DIV5
+        SUB [FACEXP], 3 ; * 0.0625
         JSR MOVAF  ; ARG = FAC
-        SET [FACHO], 0xCCCC
-        SET [FACHO+1], 0xCCCC
-        SET [FACOV], 0xCCCD
-        SET A, 0x7E 
-        SET [FACEXP], A
-        SET [FACSGN], 0
         SET [ARISGN], 0
-        JMP FMULTT
+; reciprocal multiplier for 1/1.25 (3, 6, 12, etc)
+:DIV125
+		SET X, 0xCCCC
+        JMP MULRPT
 	;JMP FACCRASH
-	
 
-; FP constant TEN for division
-; (there's no shortcut trick like in multiplying)
-:TENC
-:ROMBAF9
-        DAT 0x84, 0x2000, 0x0000
-
-:REALDIV10
-:ROMBAFE
-        JSR MOVAF  ; ARG = FAC
-        SET A, TENC
-        SET X, 0
-        SET [ARISGN], X
-        JSR MOVFM  ; FAC1 = 10
-        JMP FDIVT ; return FAC/10
+; reciprocal multiplier for 1/1.5 (3, 6, 12, etc)
+:DIV15
+		SET X, 0xAAAA
+		JMP MULRPT
+; optimized multiplier for repeating bytes
+; accepts mantissa in X
+:MULRPT
+		SET A, [ARGHO]
+		MUL A, X
+		SET Y, EX
+		SET [FACHO], Y
+		ADD Y, A  ; carry bit one place to the right
+		SET A, EX
+		ADD [FACHO], A
+		ADD Y, A ; carry bit to the infinite-right
+		SET [FACHO+1], Y
+		SET [FACOV], Y
+		IFE [ARGHO], 0
+			RTS
+		SET A, [ARGHO+1]
+		MUL A, X
+		SET Y, EX
+		ADD [FACHO+1], Y
+		ADX [FACHO], 0
+		ADD Y, A ; carry bit one place to the right
+		SET A, EX
+		ADD [FACHO+1], A
+		ADX [FACHO], 0
+		ADD Y, A ; carry bit to the infinite-right
+		ADD [FACOV], Y
+		ADX [FACHO+1], 0
+		ADX [FACHO], 0
+		RTS
 
 ; FAC <- ARG / FAC
 :FDIV
@@ -470,6 +484,7 @@
 :ROMBB12    IFE A, 0  ; dividing by 0?
                 JMP ROMBB8A ; oh shi--
             JSR ROUND
+            SET [COLOR], 0xE600
             SET A, 0
 			SUB A, [FACEXP]
             AND A, 0xFF
@@ -481,26 +496,36 @@
                 JMP OVERR
             ; special case
             SET X, [FACHO]
-            SET Y, [ARGHO] ; if divisor's mantissa is 1.0, 
-            ; copy ARG's mantissa and return
+            SET Y, [ARGHO]
+            ; if dividend and divisor have same mantissa,
+            ; set result's mantissa to 1.0 and return
+			IFE X, Y
+                IFE [FACHO+1], [ARGHO+1]
+                    JMP MOV1HO
+            IFN [FACHO+1], 0 ; no chance of reciprocal shortcut
+            	JMP FDIVFULL
+            ; m=0; copy mantissa
             IFE X, 0x8000
                 IFE [FACHO+1], 0
                     JMP MOVFAHO
-            ; if dividend and divisor have same mantissa,
-            ; set result's mantissa to 1.0 and return
-            IFE X, Y
-                IFE [FACHO+1], [ARGHO+1]
-                    JMP MOV1HO
+			; multiply by reciprocal for m=1.25 (5, 10, 20)
+            IFE X, 0xA000
+                JMP DIV125
+			; multiply by reciprocal for m=1.5 (3, 6, 12)
+            IFE X, 0xC000
+                JMP DIV15
             ; all others, do a 16-bit integer divide.
             ; this will hold us over until we can do this
             ; properly.
-            SET [FACOV], 0
-            DIV Y, X
-            SET X, EX
-            IFE Y, 0
+:FDIVFULL
+			SET [FACOV], 0
+            DIV Y, X    ; ARGHO = ARGHO / FACHO
+            SET X, EX   ; X = right of decimal point
+            IFE Y, 0    ; Y = left of decimal point
                JMP FDIVR0
 :FDIVR1
             ; result is 1.x - shift and store 17 bits
+            SET [COLOR], 0x3600
             SHR X, 1
             SET [FACHO+1], EX
             BOR X, 0x8000
@@ -511,6 +536,7 @@
 :FDIVR0A
             SHL X, 1        ; * 2
 :FDIVR0
+            SET [COLOR], 0x7600
             SUB [FACEXP], 1 ; / 2
             IFC X, 0x8000
                 JMP FDIVR0A
@@ -769,15 +795,14 @@
             IFE A, 0
                 JMP ROMBCE9 ; clear mantissa and return
 :ROMBC9F    SUB A, 0xA0
-            AND A, 0xFF
             IFA [FACSGN], -1
                 JMP ROMBCAF ; skip two lines if positive
             SET [BITS], -1  ; shift 1s from the left instead of 0s
             JSR ROMB94D  ; multiply mantissa by -1
 :ROMBCAF    SET X, FACEXP ; pointer to MULSHF operand
-            IFG A, 0xF8   ; CMP 0xF9
+            IFG A, -8   ; CMP 0xF9
                 JMP ROMBCBB
-            JSR SHIFT_RIGHT  ; MULSHF offset
+            JSR SHIFT_RIGHT  ; shift by 8 bits
             SET [BITS], 0
 :ROMBCBA    RTS
             
@@ -796,13 +821,12 @@
             JSR QINT
             SET [FACOV], 0
             SET EX, 0
-			IFU [FACSGN], 1
+			IFU [FACSGN], 0
 				SET EX, -1
             SET [FACSGN], 0
-            SET [FACEXP], 0xA0
+            SET [FACEXP], 0xA0 ; exponent is 2**32
             SET [RAM07], [RAM64]
             JMP ROMB8D2 ; re-normalize
-            
                 
 :ROMBCE9    SET [FACHO], 0
             SET [FACHO+1], 0
