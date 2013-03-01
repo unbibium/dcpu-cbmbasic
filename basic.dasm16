@@ -2977,7 +2977,8 @@
 
 ; LEN function - valtyp should be String.
 :ROMB77C    JSR ROMB782
-            JMP ROMB3A2
+            JMP GIVAYF
+            
 :ROMB782    JSR ROMB6A3  ; get length in A
             SET [VALTYP], 0 ; returning a number
             SET Y, A     
