@@ -49,6 +49,8 @@
 :RAM6F  DAT 0
 :FACOV  ;low order mantissa byte for rounding
 :RAM70  DAT 0
+:RNDX   ; random number seed
+		DAT 0x80, 0x4FC7, 0x5258
 
 :FADDH
 :ROMB849
@@ -1192,6 +1194,46 @@
 :ROMBFED    SET EX, 0xBFED
             SET C, PC
             JMP CRASH
+
+; float numbers for RND
+:ROME08D	DAT 0x98, 0x3544, 0x7A00
+:ROME092	DAT 0x68, 0x2881, 0x4600
+
+; RND FUNCTION
+:ROME097	JSR SIGN
+			IFE A, -1
+				JMP ROME0D3
+			IFE A, 1
+				JMP ROME0BE
+			JSR ROMFFF3
+			SET I, X
+			; apparently I'm supposed to re-seed
+			; FACHO with 32 bits of randomness
+			; coming from there... not sure
+			; what the best DCPU equialent is
+			; just yet.
+:ROME0BE	SET A, RNDX ; RND seed in RAM
+			JSR MOVFM
+			SET A, ROME08D
+			JSR FMULT
+			SET A, ROME092
+			JSR FADD
+			; jumble bytes
+:ROME0D3	SET A, [FACHO]
+			SET X, [FACHO+1]
+			SHR A, 8
+			BOR A, EX 
+			SHL X, 8
+			BOR X, EX
+			SET [FACHO+1], A
+			SET [FACHO], X
+:ROME0E3	SET [FACSGN], 0
+			SET [FACOV], [FACEXP]
+			SET [FACEXP], 0x80 ; LET FAC < 1
+			JSR ROMB8D7 ; Normalize
+			SET X, RNDX
+:ROME0F6	JMP ROMBBD4 ; round and move
+
 
 ; Error handler for IO calls
 :ROME0F9    IFN A, 0xF0

@@ -213,7 +213,7 @@
             DAT ROMB37D  ; fre
             DAT ROMB39E  ; pos
             DAT 0xBF71  ; sqr
-            DAT 0xE097  ; rnd
+            DAT ROME097  ; rnd
             DAT 0xB9EA  ; log
             DAT ROMBFED ; exp
             DAT 0xE264  ; cos
@@ -2926,22 +2926,41 @@
             JMP ROMB4CA ; save descriptor in $61 on stack
 :LEFTD
 :ROMB700    JSR ROMB761
-			IFG A, [Y]  ; if parameter is longet than length
-			    SET A, [Y]
+			SET X, 0
+:ROMB706	IFL A, [Y]  ; if parameter is longet than length
+			    JMP ROMB70C
+			SET A, [Y]
+			SET X, 0
 :ROMB70C	SET PUSH, A
+			SET PUSH, X
 			SET PUSH, Y
 			JSR ROMB47D   ; allocate number of bytes in A
 			SET A, [DSCPNT] ; get address
 			JSR ROMB6AA   ; Allocate string memory
-			SET Y, POP
-			SET A, POP
+			SET Y, POP  ; pop address
+			SET X, POP  ; pop starting index
+			ADD [INDEX], X
+			SET A, POP  ; pop length
 			JSR ROMB68C ; move string with length A
 :ROMB729	JMP ROMB4CA
 :RIGHTD
-:ROMB72D
+:ROMB72D	JSR ROMB761 ; get parameters
+			; set starting index to string length
+			; minus the parameter
+			SET X, [Y]
+			SUB X, A
+			JMP ROMB706
 :MIDD
-:ROMB737
-            RTS
+:ROMB737	SET [RAM64], -1
+			JSR CHRGOT
+			IFE A, 0x29 ; clos paren
+				JMP ROMB748 ; default to end-of-string
+			JSR CHKCOM
+			JSR ROMB79E  ; GETBYTC
+:ROMB748	JSR ROMB761
+:ROMB75F	;JMP ROMB70E
+			; TODO: complete
+			JMP CRASH
 
 :ROMB39E	SET C, 1
 			JSR PLOT
@@ -2949,6 +2968,8 @@
 			JMP GIVAYF
 
 ; get first 2 parameters for LEFT$/RIGHT$/MID$
+; returns A as numeric parameter
+; returns Y as pointer to string descriptor
 :ROMB761	JSR CHKCLS
 			SET X, POP ; RTS address (was 2)
 			SET A, POP ; discard - was 2
@@ -2997,7 +3018,7 @@
 ; get a POKE address
 :ROMB7EB    JSR FRMNUM  ; get an int
             JSR GETADR ; convert to integer
-            JSR ROMAEFD ; check for comma
+            JSR CHKCOM ; check for comma
             JMP ROMB79E ; get a byte value
 
 ; convert float to integer
@@ -3010,6 +3031,8 @@
         JSR QINT
         SET [LINNUM], [RAM64]
         RTS
+
+
 
 .INCLUDE "math.dasm16"
 
