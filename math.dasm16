@@ -1235,48 +1235,6 @@
 :ROME0F6	JMP ROMBBD4 ; round and move
 
 
-; Error handler for IO calls
-:ROME0F9    IFN A, 0xF0
-                JMP ROME104
-            ; 0xF0 is a special error?
-            SET [MEMSIZ], X
-            JMP ROMA663
-:ROME104    IFE X, 0
-                SET X, 0x1E   ; BREAK
-            JMP ERROR
-
-; CHROUT plus error checking for BASIC
-; (treats EX as error flag, X as error number)
-:ROME10C    JSR CHROUT
-            IFN EX, 0 ; carry bit set
-                JMP ROME0F9
-            RTS
-:ROME112    JSR CHRIN
-            IFG EX, 0
-                JMP ROME0F9
-            RTS
-:ROME118    JSR ROME4AD
-            IFG C, 0
-                JMP ROME0F9
-            RTS
-:ROME11E    JSR CHKIN
-            IFG C, 0
-                JMP ROME0F9
-            RTS
-:ROME124    JSR GETIN
-            IFG C, 0
-                JMP ROME0F9
-            RTS
-            
-:ROME4AD
-            SET PUSH, A
-            JSR ROMFFC9
-            SET  X, A
-            SET A, POP
-            IFE C, 0
-                RTS
-            SET A, X
-            RTS
 
 :XFACCRASH  SET I, [X+1]
             SET J, [X+2]

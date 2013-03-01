@@ -19,7 +19,9 @@
 .DEFINE DCPU_RIGHT 0x83
 .DEFINE DCPU_SHIFT 0x90
 .DEFINE DCPU_CTRL 0x91
+.DEFINE DCPU_STOP 0x1B
 
+.DEFINE CBM_STOP 0x03
 .DEFINE CBM_RETURN 0x0D
 .DEFINE CBM_DELETE 0x14
 .DEFINE CBM_INSERT 0x94
@@ -250,6 +252,48 @@
           .FILL HW_COLS-29 0xA02E
 
 
+; Error handler for IO calls
+:ROME0F9    IFN A, 0xF0
+                JMP ROME104
+            ; 0xF0 is a special error?
+            SET [MEMSIZ], X
+            JMP ROMA663
+:ROME104    IFE X, 0
+                SET X, 0x1E   ; BREAK
+            JMP ERROR
+
+; CHROUT plus error checking for BASIC
+; (treats EX as error flag, X as error number)
+:ROME10C    JSR CHROUT
+            IFN EX, 0 ; carry bit set
+                JMP ROME0F9
+            RTS
+:ROME112    JSR CHRIN
+            IFG EX, 0
+                JMP ROME0F9
+            RTS
+:ROME118    JSR ROME4AD
+            IFG C, 0
+                JMP ROME0F9
+            RTS
+:ROME11E    JSR CHKIN
+            IFG C, 0
+                JMP ROME0F9
+            RTS
+:ROME124    JSR GETIN
+            IFG C, 0
+                JMP ROME0F9
+            RTS
+            
+:ROME4AD
+            SET PUSH, A
+            JSR ROMFFC9
+            SET  X, A
+            SET A, POP
+            IFE C, 0
+                RTS
+            SET A, X
+            RTS
 
 
 ; get screen geometry
@@ -1225,23 +1269,6 @@ RTS
             SET [PNTR], [LNMX] ; end of line?
             RTS
 
-:ROME386
-            SET X, 0x80
-            JMP [IERROR] ;normally E38B
-:DEF_ERROR    
-:ROME38B ; error message handler
-            SET A, X
-            IFG A, 0x7F
-                JMP READY
-            JMP BASIC_ERROR
-    
-:ROME394  ; ** COLD START BASIC
-            ;JSR ROME453 ; don't need to initialize vectors
-            JSR INIT ; Initialize BASIC
-            JSR ROME422 ; Print start-up messages
-            SET SP, STACKBASEND
-            JMP ROME386
-
 
 ; In CBM BASIC, this was copied to 0073.
 ; In DCPU-16, I'm just defining this address
@@ -1526,15 +1553,14 @@ RTS
 ; check for STOP key (probably ESC)
 ; return C=1 if STOP key pressed.
 :DEF_STOP
-:ROMF6ED    SET Z, 0 ; default BNE result
+:ROMF6ED    SET Z, 0
+			SET C, 0
             IFN [RAM91], 0x7F
-                JMP ROMF6FA
+                RTS
             JSR ROMFFCC
             SET [RAMC6], A
-            SET Z, 1 ; from PLP
-:ROMF6FA    SET C, 1
-            IFL [RAM91], 0x7F
-                SET C, 0
+            SET C, 1
+            SET Z, 1
             RTS
 
 ; increment real time clock
@@ -1911,6 +1937,10 @@ RTS
     BOR [DEBUGINT+4], 0xA200
     IFL C, 0x90
         SET [KEYASCII], C ; for scanning during clock interrupt
+    SET B, -1
+    IFE C, DCPU_STOP
+    	SET B, 0x7F
+    SET [RAM91], B
     ;SET A, 2 ; check key
     ;SET B, [KEYASCII] ; original key
     ;; check for key-up event here

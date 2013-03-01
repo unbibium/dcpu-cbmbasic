@@ -521,64 +521,64 @@
 
 
 :PEEKSTACK
-			SET [0], SP
-			SET J, 0
-:PEEKLOOP	SET A, [0]
-			SET A, [A]
-			ADD [0], 1
-			ADD J, 1
-			JSR LINPRT
-			IFL [RAM49], STACKBASEND
-				JMP PEEKLOOP
-			SET Z, 0
-			RTS
-			
+            SET [0], SP
+            SET J, 0
+:PEEKLOOP   SET A, [0]
+            SET A, [A]
+            ADD [0], 1
+            ADD J, 1
+            JSR LINPRT
+            IFL [RAM49], STACKBASEND
+                JMP PEEKLOOP
+            SET Z, 0
+            RTS
+            
 
 :FNDFOR
 ; Search for "FOR" blocks on stack containing
 ; the current variable.  If found, returns the
 ; stack location as X, and Z=1.  Otherwise, Z=0
 :ROMA38A    SET Z, 0
-			SET X, SP
+            SET X, SP
             ADD X, 2 ; make allowance for two JSRs 
 :ROMA38F    SET A, [X]
-			IFN A, BASIC_FOR_TOKEN ; FOR block
+            IFN A, BASIC_FOR_TOKEN ; FOR block
                 RTS ; not a FOR block.
 :ROMA39A    IFN [FORPNT], 0
-				JMP ROMA3A4
-			SET [FORPNT], [X+1]
-:ROMA3A4	SET A, [X+1]
-			IFE [FORPNT], A
-				JMP ROMA3B7
+                JMP ROMA3A4
+            SET [FORPNT], [X+1]
+:ROMA3A4    SET A, [X+1]
+            IFE [FORPNT], A
+                JMP ROMA3B7
 :ROMA3B0    ADD X, 11
-			JMP ROMA38F
+            JMP ROMA38F
 :ROMA3B7    SET Z, 1 ; "found" result
-			RTS
-			
-:DEBUGFORx	SET A, PEEK
-			JSR LINPRT
-			SET A, PICK 0
-			JSR LINPRT
-			SET A, PICK 1
-			JSR LINPRT
-			SET A, PICK 2
-			JSR LINPRT
-			SET A, PICK 3
-			JSR LINPRT
-			SET A, PICK 4
-			JSR LINPRT
-			SET A, PICK 5
-			JSR LINPRT
-			SET A, 13
-			JSR CHROUT
-			SET A, BASIC_FOR_TOKEN
-			JSR LINPRT
-			SET A, 13
-			JSR CHROUT
-			
-:DEBUGFOR	SET Z, 0
-			RTS
-			
+            RTS
+            
+:DEBUGFORx  SET A, PEEK
+            JSR LINPRT
+            SET A, PICK 0
+            JSR LINPRT
+            SET A, PICK 1
+            JSR LINPRT
+            SET A, PICK 2
+            JSR LINPRT
+            SET A, PICK 3
+            JSR LINPRT
+            SET A, PICK 4
+            JSR LINPRT
+            SET A, PICK 5
+            JSR LINPRT
+            SET A, 13
+            JSR CHROUT
+            SET A, BASIC_FOR_TOKEN
+            JSR LINPRT
+            SET A, 13
+            JSR CHROUT
+            
+:DEBUGFOR   SET Z, 0
+            RTS
+            
 
 :BLTU
 ; Parameters in [RAM5F], [RAM5A], and [RAM58]
@@ -642,7 +642,7 @@
              ADD Z, 1            ; INY
             SET A, POP 
             IFC A, 0x80       ; PLA
-                SET PC, ROMA456  ; BPL $A456
+                JMP ROMA456  ; BPL $A456
              JSR ROMA67A ; clear some basic variables
              SET A, ROMA369  ; "  ERROR"
 :ROMA469     JSR STROUT
@@ -698,16 +698,16 @@
             STD B, [VARTAB] ; End of program text
             SUB B, J
             ADD B, I       ; End when line is removed.
-			SET [VARTAB], B ; reclaim memory for variables
+            SET [VARTAB], B ; reclaim memory for variables
             ; due to the fact that zero is always a 16-bit zero,
             ; and never the high byte of a small number, 
             ; we might be able to relink the program within the
             ; loop instead of the old way.
 :ROMA4A9L
             STI [I], [J]
-       		IFL I, B
-				JMP ROMA4A9L
-			SET [I], [J]
+            IFL I, B
+                JMP ROMA4A9L
+            SET [I], [J]
 ; insert new line.
 :ROMA4ED    JSR ROMA659 ; clear variable memory
             JSR LINKPRG ; relink basic program
@@ -1054,48 +1054,48 @@
 ;    FOR token                               @ 0 - shallow  
 
 :STMT_FOR
-:ROMA742	SET [RAM10], 0x80
-			JSR STMT_LET
-			JSR FNDFOR
-			IFE Z, 0 ;
-				JMP ROMA753
-			; we're already looping on this variable
-			ADD X, 10  ; is this right?
-			SET SP, X  ; purge that loop from the stack 
-:ROMA753	SET A, POP ; discard JSR
-			SET A, 11   ; test for this many bytes available
-			JSR GETSTK
-			JSR ROMA906 ; get end of statement
-			SET PUSH, I        ; push first statement in loop ; +1
-			SET PUSH, [CURLIN] ; push line number             ; +1
-			SET A, BASIC_TO_TOKEN   ; TO token
-			JSR SYNCHR
-			JSR ROMAD8D  ; left side of TO must be numeric
-			JSR FRMNUM   ; get number on right side of TO
-			; Compress FACSGN into FACHO;
-			; pushing only 3 words.
-			SET A, [FACSGN]
-			BOR A, 0x7FFF
-			AND A, [FACHO]
-			SET [FACHO], A
-			SET I, ROMA78B  ; return vector
-			JMP ROMAE43 ; push TO target value    +3
-			; it returns here
-:ROMA78B	SET A, FONE ; STEP 1 by default
-			JSR MOVFM
-			JSR CHRGOT
-			IFN A, BASIC_STEP_TOKEN  ; STEP token?
-				JMP ROMA79F
-			JSR CHRGET
-			JSR FRMNUM ; get STEP value
-:ROMA79F	JSR SIGN
-			JSR ROMAE38  ; push STEP with separate sign byte +4
-			SET PUSH, [FORPNT] ; pointer to increment variable +1
-			SET PUSH, BASIC_FOR_TOKEN
-			;SET A, PEEK
-			;SET B, PICK 1
-			;SET C, PICK 2
-			;DAT 0x0C00
+:ROMA742    SET [RAM10], 0x80
+            JSR STMT_LET
+            JSR FNDFOR
+            IFE Z, 0 ;
+                JMP ROMA753
+            ; we're already looping on this variable
+            ADD X, 10  ; is this right?
+            SET SP, X  ; purge that loop from the stack 
+:ROMA753    SET A, POP ; discard JSR
+            SET A, 11   ; test for this many bytes available
+            JSR GETSTK
+            JSR ROMA906 ; get end of statement
+            SET PUSH, I        ; push first statement in loop ; +1
+            SET PUSH, [CURLIN] ; push line number             ; +1
+            SET A, BASIC_TO_TOKEN   ; TO token
+            JSR SYNCHR
+            JSR ROMAD8D  ; left side of TO must be numeric
+            JSR FRMNUM   ; get number on right side of TO
+            ; Compress FACSGN into FACHO;
+            ; pushing only 3 words.
+            SET A, [FACSGN]
+            BOR A, 0x7FFF
+            AND A, [FACHO]
+            SET [FACHO], A
+            SET I, ROMA78B  ; return vector
+            JMP ROMAE43 ; push TO target value    +3
+            ; it returns here
+:ROMA78B    SET A, FONE ; STEP 1 by default
+            JSR MOVFM
+            JSR CHRGOT
+            IFN A, BASIC_STEP_TOKEN  ; STEP token?
+                JMP ROMA79F
+            JSR CHRGET
+            JSR FRMNUM ; get STEP value
+:ROMA79F    JSR SIGN
+            JSR ROMAE38  ; push STEP with separate sign byte +4
+            SET PUSH, [FORPNT] ; pointer to increment variable +1
+            SET PUSH, BASIC_FOR_TOKEN
+            ;SET A, PEEK
+            ;SET B, PICK 1
+            ;SET C, PICK 2
+            ;DAT 0x0C00
 
 ; execute next statement
 
@@ -1122,9 +1122,9 @@
 :ROMA7C9    IFE A, 0  ; no line following this one
                 JMP ROMA84B   ; end program
 
-:ROMA7CE    ADD Z, 2  ; get new current line number
-:ROMA7CF    SET [CURLIN], [Z]
-:ROMA7D8    SET [RAM7A], Z
+            ADD Z, 2  ; get new current line number
+            SET [CURLIN], [Z]
+            SET [RAM7A], Z
 :ROMA7E1    JMP [RAM0308]   ; normally A7E4
 
 :GONE    ; execute a statement
@@ -1155,113 +1155,6 @@
             JSR SYNCHR
             JMP STMT_GOTO
 
-; LET command
-:STMT_LET
-:ROMA9A5    JSR PTRGET ; get variable from name as Y 
-            ; should return an address, and 
-            ; leave the cursor before the = sign following
-            SET [FORPNT], Y ; assignments use FORPNT instead of VARPNT
-            SET A, BASIC_EQ_TOKEN ; equals code
-            JSR SYNCHR
-            SET PUSH, [INTFLG]
-            SET PUSH, [VALTYP]
-            JSR FRMEVAL
-            SET A, POP ; VALTYP of variable...
-            SHL A, 1
-            SET C, EX
-            JSR ROMAD90  ; check that it's the correct type
-			; Z flag was result of BIT $0D
-            AND A, [VALTYP]
-            IFN A, 0
-                JMP ROMA9D9  ; assign to string
-:ROMA9C1    SET A, POP  ; INTFLG of variable
-:ROMA9C2    IFC A, 0x80 ; BPL
-                JMP ROMBBD0  ; assign to float
-
-; assign to integer
-:ROMA9C4    JSR ROUND
-            JSR AYINT ; convert float to int
-            SET [RAM49], [FACHO]
-            RTS
-
-;assign to string
-:ROMA9D9    SET A, POP ; discard INTFLG from STMT_LET
-:ROMA9DA    IFN [RAM49], ROMBF13   ; I think NOTFNS does this
-                JMP ROMAA2C
-            ;assign to TI$
-            JSR ROMB6A6
-            IFN A, 6       ; length must be 6
-                JMP FCERR  ; otherwise illegal quantity error
-            SET Y, 0
-            SET [RAM61], 0
-            SET [RAM66], 0
-:ROMA9ED    SET [RAM71], Y
-            JSR ROMAA1D
-            JSR MUL10
-            ADD [RAM71], 1
-            SET Y, [RAM71]
-            JSR ROMAA1D
-            JSR MOVAF
-            SET X, A
-            IFE A, 0
-                JMP ROMAA07
-            ADD X, 1
-            SET A, X
-            JSR ROMBAED
-:ROMAA07    SET Y, [RAM71]
-            ADD Y, 1
-            IFN Y, 6
-                JMP ROMA9ED
-            JSR MUL10
-            JSR ROMBC9B
-            ; this is definitely wrong, but it
-            ; should be simple to fix later
-            SET X, [RAM64]
-            ;SET Y, [RAM62] ; 63
-            ;SET A, [RAM65]
-            JMP SETTIM
-
-; assign to variable string
-:ROMAA2C    ;DAT 0x5000
-			SET Y, [RAM64]
-			SET A, [Y]
-			SET B, [Y+1]
-            ;SET C, [FREETOP]
-            ;DAT 0x2000
-            IFL [Y+1], [FREETOP]; beginning of string variable area
-                JMP ROMAA4B ; points to a string already in memory
-            IFL Y, [VARTAB] 
-                JMP ROMAA4B ; points to a literal in BASIC
-            JMP ROMAA52     ; 
-:ROMAA4B    SET A, [RAM64] ; take pointer
-            JMP ROMAA68    ; move descriptor into variable
-:ROMAA52    SET A, [Y]
-            JSR ROMB475
-            SET [RAM6F], [DSCPNT]  ;TODO: check order
-            JSR MOVINS  ; move string
-            SET A, FACEXP
-; move 3-byte descriptor into variable
-:ROMAA68    SET [DSCPNT], A
-            JSR FRETMS ; herp derp stack
-            SET A, [DSCPNT]
-            SET Y, [RAM49]
-            SET [Y], [A]
-            SET [Y+1], [A+1]
-            SET [Y+2], [A+2]
-            RTS
-
-; add next digit to float accum
-
-:ROMAA1D    SET A, [INDEX]
-            ADD A, Y
-            SET A, [A]  ; LDA ($22),Y
-            JSR RAM0080 ; verify is digit
-            IFN C, 0 ; not a digit
-                JMP FCERR
-            SUB A, 0x30
-:ROMAA29    JMP FINLOG
-
-
 ; end line on CMD output file
 
 :STMT_RESTORE
@@ -1282,21 +1175,19 @@
 
 ; END command
 :STMT_END
-:ROMA831       SET C, 0      ; CLC
-:ROMA832       IFE Z, 0     ; Not end of statement
-                    RTS
-:ROMA834       SET A, [RAM7A]      
-:ROMA838       IFG [CURLIN], 0xFF00   ; LDX $3A
-:ROMA83A          SET PC, ROMA849  
-:ROMA83D       SET [OLDTXT],[RAM7A]  ; STA $3D
-:ROMA83F                            ; STY $3E
-:ROMA841       SET [OLDLIN],[CURLIN]
-:ROMA849       SET A, POP      ; PLA x2
-
-:ROMA84B       SET A, ROMA381 ; "BREAK"
-               IFE C, 0 ; not really a break
-                  SET PC, ROME386
-:ROMA851       JMP ROMA469
+            SET C, 0      ; CLC
+:ROMA832    IFE Z, 0     ; Not end of statement
+                RTS
+:ROMA834    SET A, [RAM7A]      
+:ROMA838    IFG [CURLIN], 0xFF00 ; in immediate mode
+                JMP ROMA849  
+            SET [OLDTXT],[RAM7A]  ; set return point
+            SET [OLDLIN],[CURLIN] ; for CONT
+:ROMA849    SET A, POP      ; don't return to NEWSTT
+:ROMA84B    SET A, ROMA381 ; "BREAK"
+            IFE C, 0 ; not really a break
+                JMP ROME386
+            JMP ROMA469  ; go to READY prompt
 
 :STMT_CONT
 :ROMA857    IFE Z, 1
@@ -1360,15 +1251,15 @@
 :STMT_RETURN
 :ROMA8D2    IFE Z, 0
                 RTS
-			BOR [RAM49], 0xFF00 ; in case GOSUB from immediate
-			JSR FNDFOR   ; Search for FOR blocks on stack
-			SET SP, X
-			IFE PEEK, BASIC_GOSUB_TOKEN ; CMP #$8D   ; GOSUB
-				JMP ROMA8EB
-			SET X, 0x0C  ; ?RETURN WITHOUT GOSUB
+            BOR [RAM49], 0xFF00 ; in case GOSUB from immediate
+            JSR FNDFOR   ; Search for FOR blocks on stack
+            SET SP, X
+            IFE PEEK, BASIC_GOSUB_TOKEN ; CMP #$8D   ; GOSUB
+                JMP ROMA8EB
+            SET X, 0x0C  ; ?RETURN WITHOUT GOSUB
             IFN X, 0x0C  ; skip next
 :ROMA8E3    SET X, 0x11 ; ?undef'd statment
-		        JMP ERROR
+                JMP ERROR
 
 ; Remove GOSUB block from stack
 :ROMA8EB    SET A, POP ; consume GOSUB token
@@ -1433,7 +1324,7 @@
 
 :STMT_ON
 :ROMA94B    JSR ROMB79E  ; Get result of expression after ON
-			SET PUSH, A  ; cache token following the expression
+            SET PUSH, A  ; cache token following the expression
             IFE A, BASIC_GOSUB_TOKEN
                 JMP ROMA957
 :ROMA953    IFN A, BASIC_GOTO_TOKEN
@@ -1469,6 +1360,112 @@
 :ROMA99F    JSR CHRGET
 :ROMA9A2    JMP ROMA971 ; get next digit or return
 
+
+; LET command
+:STMT_LET
+:ROMA9A5    JSR PTRGET ; get variable from name as Y 
+            ; should return an address, and 
+            ; leave the cursor before the = sign following
+            SET [FORPNT], Y ; assignments use FORPNT instead of VARPNT
+            SET A, BASIC_EQ_TOKEN ; equals code
+            JSR SYNCHR
+            SET PUSH, [INTFLG]
+            SET PUSH, [VALTYP]
+            JSR FRMEVAL
+            SET A, POP ; VALTYP of variable...
+            SHL A, 1
+            SET C, EX
+            JSR ROMAD90  ; check that it's the correct type
+            ; Z flag was result of BIT $0D
+            AND A, [VALTYP]
+            IFN A, 0
+                JMP ROMA9D9  ; assign to string
+:ROMA9C1    SET A, POP  ; INTFLG of variable
+:ROMA9C2    IFC A, 0x80 ; BPL
+                JMP ROMBBD0  ; assign to float
+
+; assign to integer
+:ROMA9C4    JSR ROUND
+            JSR AYINT ; convert float to int
+            SET [RAM49], [FACHO]
+            RTS
+
+;assign to string
+:ROMA9D9    SET A, POP ; discard INTFLG from STMT_LET
+:ROMA9DA    IFN [RAM49], ROMBF13   ; I think NOTFNS does this
+                JMP ROMAA2C
+            ;assign to TI$
+            JSR ROMB6A6
+            IFN A, 6       ; length must be 6
+                JMP FCERR  ; otherwise illegal quantity error
+            SET Y, 0
+            SET [RAM61], 0
+            SET [RAM66], 0
+:ROMA9ED    SET [RAM71], Y
+            JSR ROMAA1D
+            JSR MUL10
+            ADD [RAM71], 1
+            SET Y, [RAM71]
+            JSR ROMAA1D
+            JSR MOVAF
+            SET X, A
+            IFE A, 0
+                JMP ROMAA07
+            ADD X, 1
+            SET A, X
+            JSR ROMBAED
+:ROMAA07    SET Y, [RAM71]
+            ADD Y, 1
+            IFN Y, 6
+                JMP ROMA9ED
+            JSR MUL10
+            JSR ROMBC9B
+            ; this is definitely wrong, but it
+            ; should be simple to fix later
+            SET X, [RAM64]
+            ;SET Y, [RAM62] ; 63
+            ;SET A, [RAM65]
+            JMP SETTIM
+
+; assign to variable string
+:ROMAA2C    ;DAT 0x5000
+            SET Y, [RAM64]
+            SET A, [Y]
+            SET B, [Y+1]
+            ;SET C, [FREETOP]
+            ;DAT 0x2000
+            IFL [Y+1], [FREETOP]; beginning of string variable area
+                JMP ROMAA4B ; points to a string already in memory
+            IFL Y, [VARTAB] 
+                JMP ROMAA4B ; points to a literal in BASIC
+            JMP ROMAA52     ; 
+:ROMAA4B    SET A, [RAM64] ; take pointer
+            JMP ROMAA68    ; move descriptor into variable
+:ROMAA52    SET A, [Y]
+            JSR ROMB475
+            SET [RAM6F], [DSCPNT]  ;TODO: check order
+            JSR MOVINS  ; move string
+            SET A, FACEXP
+; move 3-byte descriptor into variable
+:ROMAA68    SET [DSCPNT], A
+            JSR FRETMS ; herp derp stack
+            SET A, [DSCPNT]
+            SET Y, [RAM49]
+            SET [Y], [A]
+            SET [Y+1], [A+1]
+            SET [Y+2], [A+2]
+            RTS
+
+; add next digit to float accum
+
+:ROMAA1D    SET A, [INDEX]
+            ADD A, Y
+            SET A, [A]  ; LDA ($22),Y
+            JSR RAM0080 ; verify is digit
+            IFN C, 0 ; not a digit
+                JMP FCERR
+            SUB A, 0x30
+:ROMAA29    JMP FINLOG
 
 :STMT_PRINTN
 :ROMAA80    JSR ROMAA86
@@ -1698,7 +1695,7 @@
             JSR ROMABB5
             JMP STMT_DATA ; jump to end of statement
 :ROMABEA    SET A, [RAM0200]
-			IFN A, 0
+            IFN A, 0
                 JMP ROMAC0D ; pass X as input buffer start
             SET A, [CHANNL]
             IFN A, 0
@@ -1708,9 +1705,9 @@
 
 ; get line into input buffer
 :ROMABF9    IFN [RAM13], 0
-				JMP ROMAC03
-			JSR ROMAB45 ; print question mark
-			JSR ROMAB3B
+                JMP ROMAC03
+            JSR ROMAB45 ; print question mark
+            JSR ROMAB3B
 :ROMAC03    JMP INLIN
 
 :STMT_READ
@@ -1733,8 +1730,8 @@
             SET X, RAM01FF
             JMP ROMAC4D
 :ROMAC41    IFE [INPFLG], INF_READ
-				JMP ROMACB8
-			SET A, [CHANNL]
+                JMP ROMACB8
+            SET A, [CHANNL]
             IFN A, 0
                 JMP [ROMAC4A]
             JSR ROMAB45 ; print question mark
@@ -1789,8 +1786,8 @@
             ADD I, 1
             IFE [I], 0 ; no next line?
                 JMP ERROR ; throw ?OUT OF DATA
-        	ADD I, 1
-        	SET [DATLIN], [I]
+            ADD I, 1
+            SET [DATLIN], [I]
 :ROMACD1    SET [RAM7A], I
             JSR CHRGOT
             SET X, A
@@ -1799,7 +1796,7 @@
             JMP ROMAC51
 :ROMACDF    SET A, [INPPTR]
             IFE [INPFLG], INF_READ ; bpl
-            	JMP ROMA827 ; set next line's data stmt
+                JMP ROMA827 ; set next line's data stmt
             IFE [A], 0
                 RTS
             IFN [CHANNL], 0
@@ -1818,7 +1815,7 @@
 :STMT_NEXT
 :ROMAD1E    IFE Z, 0
                 JMP ROMAD24
-			SET Y, 0     ; don't know which variable to advance
+            SET Y, 0     ; don't know which variable to advance
             JMP ROMAD27
 :ROMAD24    JSR PTRGET   ; get variable to advance in Y
 :ROMAD27    SET [FORPNT], Y
@@ -1829,31 +1826,31 @@
 :ROMAD30    SET X, 0x0A ; ?NEXT WITHOUT FOR
             JMP ERROR
 :ROMAD35    SET SP, X  ; synchronize stack with that FOR
-			; this discards any inner loops we've skipped
-:ROMAD42	SET A, SP
-			ADD A, 2   ; pointer to STEP value
-			JSR MOVFM  ; set FAC1
-			SET [FACSGN], PICK 5
-:ROMAD4B	SET A, [FORPNT] ; pointer to loop variable
-:ROMAD4F	JSR FADD        ; add to STEP value
-			JSR ROMBBD0     ; set loop variable to result
-			SET A, SP
-			ADD A, 6   ; pointer to TO value
-			JSR FCOMP ; compare TO value (I) with loop variable
-			; break out if comparison matches sign of STEP
-			IFE A, PICK 5
-				JMP ROMAD78
-:ROMAD61	; last time through loop
-			SET [CURLIN], PICK 9
-			SET [RAM7A], PICK 10
-:ROMAD75	JMP NEWSTT
-			; end of loop
-:ROMAD78	ADD SP, 11    ; pop FOR block from stack
-			JSR CHRGOT
-:ROMAD80	IFN A, CBM_COMMA
-				JMP NEWSTT
-			JSR CHRGET   ; it's NEXT X,Y -- do NEXT Y also
-			JSR ROMAD24  ; must JSR so that the POP works.
+            ; this discards any inner loops we've skipped
+:ROMAD42    SET A, SP
+            ADD A, 2   ; pointer to STEP value
+            JSR MOVFM  ; set FAC1
+            SET [FACSGN], PICK 5
+:ROMAD4B    SET A, [FORPNT] ; pointer to loop variable
+:ROMAD4F    JSR FADD        ; add to STEP value
+            JSR ROMBBD0     ; set loop variable to result
+            SET A, SP
+            ADD A, 6   ; pointer to TO value
+            JSR FCOMP ; compare TO value (I) with loop variable
+            ; break out if comparison matches sign of STEP
+            IFE A, PICK 5
+                JMP ROMAD78
+:ROMAD61    ; last time through loop
+            SET [CURLIN], PICK 9
+            SET [RAM7A], PICK 10
+:ROMAD75    JMP NEWSTT
+            ; end of loop
+:ROMAD78    ADD SP, 11    ; pop FOR block from stack
+            JSR CHRGOT
+:ROMAD80    IFN A, CBM_COMMA
+                JMP NEWSTT
+            JSR CHRGET   ; it's NEXT X,Y -- do NEXT Y also
+            JSR ROMAD24  ; must JSR so that the POP works.
  
 ; get formula, enforce that it is a number.
 :FRMNUM
@@ -1959,7 +1956,7 @@
 ; to both set VALTYP to "numeric" for all future BMI tests, while
 ; getting its carry bit from the low bit.  I'll have to investigate.
 :ROMAE07    SET C, [VALTYP]
-			SET [VALTYP], 0
+            SET [VALTYP], 0
             SET A, [OPMASK]
             SHL A, 1
             AND C, 1
@@ -1986,10 +1983,10 @@
 ; save rounded value of left operand
 ; X is set to the first column of the operator table
 :ROMAE33    SET X, [TBL_OP+Y]
-			SET A, [FACSGN]
-			; Other entry points are used by FOR
-			; statement to push floats.
-:ROMAE38	SET I, POP
+            SET A, [FACSGN]
+            ; Other entry points are used by FOR
+            ; statement to push floats.
+:ROMAE38    SET I, POP
             SET PUSH, A
 :ROMAE43    JSR ROUND
             SET PUSH, [FACHO+1]
@@ -2043,7 +2040,7 @@
             JSR MOVFM
             JMP CHRGET
 :PIVAL      DAT 0x82, 0x490F, 0xDAA1  ; float value of PI
-			; not a digit, variable, or pi:
+            ; not a digit, variable, or pi:
 :ROMAEAD    SET C, 1 ; so FIN knows dot isn't a digit
             IFE A, 0x2E ; Decimal point
                 JMP FIN ; read a number
@@ -2053,17 +2050,17 @@
                 JMP ROMAE8A
             IFN A, CBM_QUOTE ; quote mark
                 JMP ROMAECC
-        	SET C, 0
+            SET C, 0
             IFG A, CBM_QUOTE-1 ; carry over from 6502 CMP above
                 SET C, 1 
 ; remember to set carry bit before jumping here.
 ; this entry point consumes a string in quotes.
 :ROMAEBD    SET A, [RAM7A]
-			ADD A, C
+            ADD A, C
             JSR STRLIT
             JMP ROMB7E2  ; move RAM7A cursor to AFTER string
              ; and return.
-			;not a digit, variable, pi, string, or */-
+            ;not a digit, variable, pi, string, or */-
 :ROMAECC    IFN A, BASIC_NOT_TOKEN
                 JMP ROMAEE3
             SET Y, TBL_OP_NOT-TBL_OP ; vector into TBL_OP
@@ -2105,36 +2102,36 @@
                 JMP CHRGET
 :SNERR ; ?SYNTAX  ERROR
 :ROMAF08    IFE DEBUG_SNERR, 1
-				JSR PRINT_EXPECTED
-			SET X, 0x0B ; 
+                JSR PRINT_EXPECTED
+            SET X, 0x0B ; 
             JMP ERROR
 
-:SN_EXPECTED	DAT 0
-:SN_GOT  		DAT 0
+:SN_EXPECTED    DAT 0
+:SN_GOT         DAT 0
 ; new feature: prints the character it was expecting
 :PRINT_EXPECTED
-		SET [SN_EXPECTED], A
-		SET [SN_GOT], [Y]
-		SET A, EXPECTED_MSG
-		JSR STROUT
-		SET A, [SN_EXPECTED]
-		JSR CHROUT
-		SET A, GOT_MSG
-		JSR STROUT
-		SET A, [SN_GOT]
-		IFE A, 0
-			JMP SN_GOT_NULL
-		JMP CHROUT
+        SET [SN_EXPECTED], A
+        SET [SN_GOT], [Y]
+        SET A, EXPECTED_MSG
+        JSR STROUT
+        SET A, [SN_EXPECTED]
+        JSR CHROUT
+        SET A, GOT_MSG
+        JSR STROUT
+        SET A, [SN_GOT]
+        IFE A, 0
+            JMP SN_GOT_NULL
+        JMP CHROUT
 :SN_GOT_NULL
-		SET A, NULL_MSG
-		JMP STROUT
-				
+        SET A, NULL_MSG
+        JMP STROUT
+                
 :EXPECTED_MSG
-	DAT 13,"EXPECTED ", 0
+    DAT 13,"EXPECTED ", 0
 :GOT_MSG
-	DAT ", GOT ", 0
+    DAT ", GOT ", 0
 :NULL_MSG
-	DAT "NULL", 0
+    DAT "NULL", 0
 
 ; RECURSIVE get value
 
@@ -2159,8 +2156,8 @@
 :ROMAF28    JSR PTRGET  ; get pointer in Y
 :ISVAR
 :ROMAF2B    SET [RAM64], Y
-			SET X, [VARNAM]
-			SET Y, [VARNAM+1]
+            SET X, [VARNAM]
+            SET Y, [VARNAM+1]
             IFE [VALTYP], 0
                 JMP ROMAF5D
             SET [FACOV], 0
@@ -2217,31 +2214,31 @@
             ; handle single-argument functions
 :ROMAFD1    JSR PARCHK ; evaluate between parens
             SET Y, POP
-			SET A, Y ; DEBUG
-			SET B, FUNCTION_VECTOR ; DEBUG
-			SET C, FUNCTION_ROUTINES
+            SET A, Y ; DEBUG
+            SET B, FUNCTION_VECTOR ; DEBUG
+            SET C, FUNCTION_ROUTINES
 :ROMAFD6    ADD Y, FUNCTION_VECTOR
-			JSR [Y]
-			JMP ROMAD8D ; check return is numeric
+            JSR [Y]
+            JMP ROMAD8D ; check return is numeric
 
 ; OR/AND operators
 
-:ROMAFE6	SET Y, -1
-			IFN Y, -1 ; skip next
-:ROMAFE9	SET Y, 0
-			SET [RAM0B], Y
-			JSR AYINT    ; float to integer
-			SET A, [RAM64]
-			XOR A, [RAM0B]
-			SET [RAM07], A
-			JSR MOVFA
-			JSR AYINT
-			SET A, [RAM64]
-			XOR A, [RAM0B]
-			AND A, [RAM07]
-			XOR A, [RAM0B]
-			JMP GIVAYF
-				
+:ROMAFE6    SET Y, -1
+            IFN Y, -1 ; skip next
+:ROMAFE9    SET Y, 0
+            SET [RAM0B], Y
+            JSR AYINT    ; float to integer
+            SET A, [RAM64]
+            XOR A, [RAM0B]
+            SET [RAM07], A
+            JSR MOVFA
+            JSR AYINT
+            SET A, [RAM64]
+            XOR A, [RAM0B]
+            AND A, [RAM07]
+            XOR A, [RAM0B]
+            JMP GIVAYF
+                
 
 ; get time in float accu
 :ROMAF84    JSR ROMFFDE
@@ -2254,66 +2251,66 @@
 
 ; comparison operators...
 
-:ROMB016	; C should be 1 if the other side was a
+:ROMB016    ; C should be 1 if the other side was a
             ; string expression, 0 otherwise.
-			JSR ROMAD90 ; make sure VALTYP matches C.
-			IFE C, 1   ; string
-				JMP ROMB02E
-			SET A, [ARGSGN]
-			BOR A, 0x7FFF
-			AND A, [ARGHO]
-			SET [ARGHO], A
-			SET A, ARGEXP  ; pass pointer to FCOMP
-			JSR FCOMP
-			SET X, A
-			JMP ROMB061
-			; string compare
-:ROMB02E	SET [VALTYP], 0 ; result is numeric
-			SUB [RAM4D], 1
-			JSR ROMB6A6  ; get string length and address
-			SET [RAM61], A
-			SET [RAM62], X
-			SET A, [ARGHO+1]
-:ROMB041	JSR ROMB6AA ; allocate string memory
-			SET [RAM6C], X ; store string address
-			SET X, A
-			SUB A, [RAM61]
-			IFE A, 0
-				JMP ROMB056
-			SET A, 1
-			IFE EX, -1
-				JMP ROMB056
-:ROMB056	SET [FACSGN], A
-			SET I, [ARGHO+1]
-			SET J, [RAM62]
-:ROMB05B	ADD X, 1
-			ADD I, 1 ; INY to two vectors
-			ADD J, I
-			SUB X, 1
-			IFN X, 0
-				JMP ROMB066
-			SET X, [FACSGN]
-:ROMB061	SET I, [ARGHO+1]  ; ($6C),Y
-			SET J, [RAM62]  ; ($62),Y
-			IFB X, 0x8000
-				JMP ROMB072
-			SET C, 0
-			JMP ROMB072
-:ROMB066	SET A, [I]
-			SUB A, [J]
-			IFE A, 0
-				JMP ROMB05B
-			SET X, -1
-			IFE EX, 0
-				SET X, 1
-:ROMB072	ADD X, 1
-			SET A, X
-			shl A, 1
-			AND A, [RAM12]   ; comparison
-			IFN A, 0
-				SET A, -1
-			JMP ROMBC3C
-			
+            JSR ROMAD90 ; make sure VALTYP matches C.
+            IFE C, 1   ; string
+                JMP ROMB02E
+            SET A, [ARGSGN]
+            BOR A, 0x7FFF
+            AND A, [ARGHO]
+            SET [ARGHO], A
+            SET A, ARGEXP  ; pass pointer to FCOMP
+            JSR FCOMP
+            SET X, A
+            JMP ROMB061
+            ; string compare
+:ROMB02E    SET [VALTYP], 0 ; result is numeric
+            SUB [RAM4D], 1
+            JSR ROMB6A6  ; get string length and address
+            SET [RAM61], A
+            SET [RAM62], X
+            SET A, [ARGHO+1]
+:ROMB041    JSR ROMB6AA ; allocate string memory
+            SET [RAM6C], X ; store string address
+            SET X, A
+            SUB A, [RAM61]
+            IFE A, 0
+                JMP ROMB056
+            SET A, 1
+            IFE EX, -1
+                JMP ROMB056
+:ROMB056    SET [FACSGN], A
+            SET I, [ARGHO+1]
+            SET J, [RAM62]
+:ROMB05B    ADD X, 1
+            ADD I, 1 ; INY to two vectors
+            ADD J, I
+            SUB X, 1
+            IFN X, 0
+                JMP ROMB066
+            SET X, [FACSGN]
+:ROMB061    SET I, [ARGHO+1]  ; ($6C),Y
+            SET J, [RAM62]  ; ($62),Y
+            IFB X, 0x8000
+                JMP ROMB072
+            SET C, 0
+            JMP ROMB072
+:ROMB066    SET A, [I]
+            SUB A, [J]
+            IFE A, 0
+                JMP ROMB05B
+            SET X, -1
+            IFE EX, 0
+                SET X, 1
+:ROMB072    ADD X, 1
+            SET A, X
+            shl A, 1
+            AND A, [RAM12]   ; comparison
+            IFN A, 0
+                SET A, -1
+            JMP ROMBC3C
+            
 
 ;get name and pointer to a variable.
 ; At the end, the cursor should be at the last character of 
@@ -2503,14 +2500,14 @@
             JMP CRASH
 
 ; fre(0)
-:ROMB37D	IFN [VALTYP], 0
-				JSR ROMB6A6  
-			JSR ROMB526
-			SET A, [RAM33]
-			SUB A, [RAM31]
-			; fall through to GIVAYF
-			; TODO: make it unsigned.
-			; the answer may be >32768.
+:ROMB37D    IFN [VALTYP], 0
+                JSR ROMB6A6  
+            JSR ROMB526
+            SET A, [RAM33]
+            SUB A, [RAM31]
+            ; fall through to GIVAYF
+            ; TODO: make it unsigned.
+            ; the answer may be >32768.
 
 :GIVAYF ;Convert 16-Bit Signed Integer to Floating Point
 :ROMB391    SET [VALTYP], 0   ; numeric
@@ -2596,8 +2593,8 @@
 :ROMB4A8    
 :ROMB4A9    SET Y, I         ; subtract original pointer
             SUB Y, [RAM6F]   ; to obtain the length
-			IFE A, CBM_QUOTE 
-            	ADD I, 1     ; put end past trailing quote
+            IFE A, CBM_QUOTE 
+                ADD I, 1     ; put end past trailing quote
             SET [RAM61], Y  ; Length in [RAM61]
             SET [RAM71], I  ;originally had to add Y to RAM6F
             ; oh wait this is a test on MSB of RAM6F
@@ -2605,7 +2602,7 @@
             ; i think this bit here is set to treat
             ; stuff in the 200-2FF range different from
             ; stuff in the ROM range
-:ROMB4B7	IFE [RAM6F], 0   ; test for whatever happens below B4D5.
+:ROMB4B7    IFE [RAM6F], 0   ; test for whatever happens below B4D5.
                 JMP ROMB4BF  ; it makes the memory copy unconditional
             IFG A, RAM0200+BASIC_BUFFER_LENGTH ; not immediate mode
                 JMP ROMB4CA  ; skip memory copy 
@@ -2614,7 +2611,7 @@
             ; if it's in the temporary string area,
             ; it needs to be moved into memory
 :ROMB4BF    ; Y should have a string length now
-			; and RAM6F should be the start of source memory
+            ; and RAM6F should be the start of source memory
             SET A, Y        ; send A as length
             JSR ROMB475     ; send destination in [FRESPC]
             SET X, [RAM6F]  ; send source as X
@@ -2678,7 +2675,7 @@
 ; returns pointer in X
 :GETSPA
 :ROMB4F4    ;SET EX, [GARBFL]
-			SHR [GARBFL], 1
+            SHR [GARBFL], 1
             ;SET C, EX  ;???
 :ROMB4F6    ;WARNING: potential for off-by-one error here
             SET X, [FREETOP] ; pointer to end of free RAM
@@ -2691,7 +2688,7 @@
             RTS
             
 :ROMB516    DAT 0x6C00   ; don't know how to GC yet
-			SET X, 0x10
+            SET X, 0x10
             SET B, [GARBFL]
             IFG B, 0x7f
                 JSR GARBAG
@@ -2916,7 +2913,7 @@
             RTS
 :CHRD
 :ROMB6EC    JSR ROMB7A1  ; get byte operand
-			SET PUSH, X  ; push byte result
+            SET PUSH, X  ; push byte result
             SET A, 1
             JSR ROMB47D   ; create a string 
             SET A, POP
@@ -2926,65 +2923,65 @@
             JMP ROMB4CA ; save descriptor in $61 on stack
 :LEFTD
 :ROMB700    JSR ROMB761
-			SET X, 0
-:ROMB706	IFL A, [Y]  ; if parameter is longet than length
-			    JMP ROMB70C
-			SET A, [Y]
-			SET X, 0
-:ROMB70C	SET PUSH, A
-			SET PUSH, X
-			SET PUSH, Y
-			JSR ROMB47D   ; allocate number of bytes in A
-			SET A, [DSCPNT] ; get address
-			JSR ROMB6AA   ; Allocate string memory
-			SET Y, POP  ; pop address
-			SET X, POP  ; pop starting index
-			ADD [INDEX], X
-			SET A, POP  ; pop length
-			JSR ROMB68C ; move string with length A
-:ROMB729	JMP ROMB4CA
+            SET X, 0
+:ROMB706    IFL A, [Y]  ; if parameter is longet than length
+                JMP ROMB70C
+            SET A, [Y]
+            SET X, 0
+:ROMB70C    SET PUSH, A
+            SET PUSH, X
+            SET PUSH, Y
+            JSR ROMB47D   ; allocate number of bytes in A
+            SET A, [DSCPNT] ; get address
+            JSR ROMB6AA   ; Allocate string memory
+            SET Y, POP  ; pop address
+            SET X, POP  ; pop starting index
+            ADD [INDEX], X
+            SET A, POP  ; pop length
+            JSR ROMB68C ; move string with length A
+:ROMB729    JMP ROMB4CA
 :RIGHTD
-:ROMB72D	JSR ROMB761 ; get parameters
-			; set starting index to string length
-			; minus the parameter
-			SET X, [Y]
-			SUB X, A
-			JMP ROMB706
+:ROMB72D    JSR ROMB761 ; get parameters
+            ; set starting index to string length
+            ; minus the parameter
+            SET X, [Y]
+            SUB X, A
+            JMP ROMB706
 :MIDD
-:ROMB737	SET [RAM64], -1
-			JSR CHRGOT
-			IFE A, 0x29 ; clos paren
-				JMP ROMB748 ; default to end-of-string
-			JSR CHKCOM
-			JSR ROMB79E  ; GETBYTC
-:ROMB748	JSR ROMB761
-:ROMB75F	;JMP ROMB70E
-			; TODO: complete
-			JMP CRASH
+:ROMB737    SET [RAM64], -1
+            JSR CHRGOT
+            IFE A, 0x29 ; clos paren
+                JMP ROMB748 ; default to end-of-string
+            JSR CHKCOM
+            JSR ROMB79E  ; GETBYTC
+:ROMB748    JSR ROMB761
+:ROMB75F    ;JMP ROMB70E
+            ; TODO: complete
+            JMP CRASH
 
-:ROMB39E	SET C, 1
-			JSR PLOT
-:ROMB3A2	SET A, 0
-			JMP GIVAYF
+:ROMB39E    SET C, 1
+            JSR PLOT
+:ROMB3A2    SET A, 0
+            JMP GIVAYF
 
 ; get first 2 parameters for LEFT$/RIGHT$/MID$
 ; returns A as numeric parameter
 ; returns Y as pointer to string descriptor
-:ROMB761	JSR CHKCLS
-			SET X, POP ; RTS address (was 2)
-			SET A, POP ; discard - was 2
-			SET A, POP ; first numeric parameter
-			SET Y, POP ; pointer to string descriptor
-			SET [DSCPNT], Y
-			JMP X
+:ROMB761    JSR CHKCLS
+            SET X, POP ; RTS address (was 2)
+            SET A, POP ; discard - was 2
+            SET A, POP ; first numeric parameter
+            SET Y, POP ; pointer to string descriptor
+            SET [DSCPNT], Y
+            JMP X
 
 ; LEN function - valtyp should be String.
-:ROMB77C	JSR ROMB782
-			JMP ROMB3A2
-:ROMB782	JSR ROMB6A3  ; get length in A
-			SET [VALTYP], 0 ; returning a number
-			SET Y, A     
-			RTS
+:ROMB77C    JSR ROMB782
+            JMP ROMB3A2
+:ROMB782    JSR ROMB6A3  ; get length in A
+            SET [VALTYP], 0 ; returning a number
+            SET Y, A     
+            RTS
 
 ; get an integer that fits into a byte
 :GETBYTC
@@ -2995,23 +2992,23 @@
             JMP CHRGOT
 
 :VAL
-:ROMB7AD	JSR ROMB782
-			IFE A, 0
-				JMP ROMB7B5
-			JMP ROMB8F7 ; zero FACEXP and FACSGN
-:ROMB7B5	SET X, [RAM7A]
-			SET [RAM71], X
-			SET A, [INDEX]
-			SET [RAM7A], A
-			ADD X, A
-			; wait, did we just add two pointers?
-			; I need to examine what ROMB6A3 returns in [INDEX].
-			DAT 0x2000
-:ROMB7D7	JSR CHRGOT
-			JSR FIN
-			SET A, POP
-			SET [J], 0
-			; move BASIC text cursor to end of string.
+:ROMB7AD    JSR ROMB782
+            IFE A, 0
+                JMP ROMB7B5
+            JMP ROMB8F7 ; zero FACEXP and FACSGN
+:ROMB7B5    SET X, [RAM7A]
+            SET [RAM71], X
+            SET A, [INDEX]
+            SET [RAM7A], A
+            ADD X, A
+            ; wait, did we just add two pointers?
+            ; I need to examine what ROMB6A3 returns in [INDEX].
+            DAT 0x2000
+:ROMB7D7    JSR CHRGOT
+            JSR FIN
+            SET A, POP
+            SET [J], 0
+            ; move BASIC text cursor to end of string.
 :ROMB7E2    SET [RAM7A], [RAM71]
             RTS
 
@@ -3033,6 +3030,23 @@
         RTS
 
 
+:ROME386
+            SET X, 0x80
+            JMP [IERROR] ;normally E38B
+:DEF_ERROR    
+:ROME38B ; error message handler
+            IFG X, 0x7F
+                JMP READY
+            JMP BASIC_ERROR
+    
+:ROME394  ; ** COLD START BASIC
+            ;JSR ROME453 ; don't need to initialize vectors
+            JSR INIT ; Initialize BASIC
+            JSR ROME422 ; Print start-up messages
+            SET SP, STACKBASEND
+            JMP ROME386
+
 
 .INCLUDE "math.dasm16"
+
 
