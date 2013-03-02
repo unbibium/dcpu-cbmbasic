@@ -216,9 +216,9 @@
             DAT ROME097  ; rnd
             DAT 0xB9EA  ; log
             DAT ROMBFED ; exp
-            DAT 0xE264  ; cos
-            DAT 0xE26B  ; sin
-            DAT 0xE2B4  ; tan
+            DAT ROME264  ; cos
+            DAT ROME26B  ; sin
+            DAT ROME2B4  ; tan
             DAT 0xE30E  ; atn
             DAT 0xB80D  ; peek
             DAT ROMB77C  ; len
@@ -1865,7 +1865,7 @@
             RTS
 ; this one will need a lot of testing
 ; check value according to C flag
-:ROMAD90    IFU [VALTYP], -1
+:ROMAD90    IFC [VALTYP], 0xFF80
                 JMP ROMAD97
             IFN C, 0
                 JMP ROMAD99
@@ -2250,11 +2250,30 @@
             RTS
 
 ; comparison operators...
-
-:ROMB016    ; C should be 1 if the other side was a
+; [VALTYP] refers to the type of the right-hand side
+; C should refer to the type of the left-hand side
+; but right now it's always 1,
+; as these debug statements indicate
+:ROMB016    SET PUSH, C
+			SET PUSH, [VALTYP]
+			SET A, 13
+			JSR CHROUT
+			SET A, 67
+			JSR CHROUT
+			SET A, PICK 1
+			JSR LINPRT
+			SET A, 13
+			JSR CHROUT
+			SET A, 86
+			JSR CHROUT
+			SET A, PEEK
+			JSR LINPRT
+			SET [VALTYP], POP
+			SET C, POP
+			; C should be 1 if the other side was a
             ; string expression, 0 otherwise.
             JSR ROMAD90 ; make sure VALTYP matches C.
-            IFE C, 1   ; string
+            IFN C, 0   ; string
                 JMP ROMB02E
             SET A, [ARGSGN]
             BOR A, 0x7FFF

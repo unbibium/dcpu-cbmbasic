@@ -479,6 +479,10 @@
 		ADX [FACHO], 0
 		RTS
 
+:ROMBB07	SET [ARISGN], 0
+			JSR MOVFM
+			JMP FDIVT
+
 ; FAC <- ARG / FAC
 :FDIV
 :ROMBB0F    JSR CONUPK ; copy to ARG; should return exp in A
@@ -1199,6 +1203,32 @@
 :ROME08D	DAT 0x98, 0x3544, 0x7A00
 :ROME092	DAT 0x68, 0x2881, 0x4600
 
+; compute odd degrees for SIN and ATN
+:ROME043	SET [RAM71], A
+			JSR ROMBBCA ; move FAC1 to FAC3
+			SET A, RAM57
+			JSR FMULT
+			JSR ROME05D
+			SET A, RAM57
+			JMP FMULT
+; compute polynomials
+:ROME059	SET [RAM71], A
+:ROME05D	JSR MOV2F ; move FAC1 to RAM5C
+			SET Y, [RAM71]
+:ROME060	SET A, [Y]
+			SET [RAM67], A
+			ADD Y, 1
+			SET [RAM71], Y
+:ROME070	JSR FMULT
+			ADD [RAM71], 5
+			JSR FADD
+			SET A, RAM5C
+			SUB [RAM67], 1
+			IFN [RAM67], 0
+				JMP ROME070
+			RTS
+			
+
 ; RND FUNCTION
 :ROME097	JSR SIGN
 			IFE A, -1
@@ -1232,9 +1262,77 @@
 			SET [FACEXP], 0x80 ; LET FAC < 1
 			JSR ROMB8D7 ; Normalize
 			SET X, RNDX
-:ROME0F6	JMP ROMBBD4 ; round and move
+:ROME0F6	JMP ROMBBD4 ; round FAC1 and move to X
 
+; COS function
+:ROME264	SET A, ROME2E0 
+			JSR FADD
+; SIN function
+:ROME26B	JSR MOVAF
+			SET A, ROME2E5
+			SET X, [ARGSGN]
+			JSR ROMBB07  ; divide by 2*PI
+			JSR MOVAF
+			JSR INT   ; really?
+			SET [ARISGN], 0
+			JSR FSUBT
+			SET A, ROME2EA
+			JSR FSUB
+			SET A, [FACSGN]
+			SET PUSH, A
+			IFA A, -1
+				JMP ROME29D
+			JSR FADDH
+			SET A, [FACSGN]
+			IFU A, 0
+				JMP ROME2A0
+			XOR [RAM12], -1 ; ???
+:ROME29D	JSR NEGOP
+:ROME2A0	SET A, ROME2EA
+			JSR FADD
+			SET A, POP
+			IFA A, -1
+				JMP ROME2AD
+			JSR NEGOP
+:ROME2AD	SET A, ROME2EF
+			JMP ROME043
 
+; TAN function
+:ROME2B4	JSR ROMBBCA ; move FAC1 to FAC3
+			SET [RAM12], 0
+			JSR ROME26B
+			SET X, [RAM4E]
+			JSR ROME0F6 ; round FAC1 and move to X
+			SET A, [RAM57] ; FAC3
+			JSR MOVFM   ; FAC1 <- FAC3
+			SET [FACSGN], 0
+			SET A, [RAM12]
+			JSR ROME2DC
+			SET A, [RAM4E]
+			JMP FDIV ; ohshi--
+
+:RAM4E	DAT 0, 0, 0
+
+:ROME2DC	SET PUSH, A
+			JMP ROME29D
+			
+; float numbers for trigonometry
+
+; 0.5 * pi
+:ROME2E0	DAT 0x81, 0x490F, 0xDAA2
+; 2 * pi
+:ROME2E5	DAT 0x83, 0x490F, 0xDAA2
+; 0.25
+:ROME2EA	DAT 0x7F, 0, 0
+
+; Polynomial table
+:ROME2EF	DAT 5  ; degree 6
+:ROME2F0	DAT 0x84, 0xE61A, 0x2D1B
+			DAT 0x86, 0x2807, 0xfbf8
+			DAT 0x87, 0x9968, 0x8901
+			DAT 0x87, 0x2335, 0xdfe1
+			DAT 0x86, 0xa55d, 0xe728
+			DAT 0x83, 0x490f, 0xdaa2
 
 :XFACCRASH  SET I, [X+1]
             SET J, [X+2]
