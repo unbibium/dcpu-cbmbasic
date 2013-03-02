@@ -41,19 +41,20 @@ mostly like they do on the C64:
 * Immediate mode
 * BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, 
                   NEW, STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT
+* BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$()
 * BASIC keyword abbreviations with shifted second letters
 * The ? abbreviation for PRINT
-* Expressions involving positive integers, addition, subtraction,
-  and multiplication.
+* Expressions involving floating-point addition, subtraction,
+  and multiplication to 32-bit accuracy.
+* Floating point division to 16-bit accuracy, more for special
+  cases like division by 5 or 3.
 * String literals and concatenation.
 * Allocating, setting, and retrieving string variables like A$
 * Allocating, setting, and retrieving float variables like A
 
 Just about anything else won't work, and may even crash the machine.
 Even some of the above are useless due to a lack of supporting
-functions like comparison operators, inputting numbers with decimal
-points, the division operator, or functions like RND() and MID$().  
-It's rapidly becoming more complete.
+functions, or bugs.  It's rapidly becoming more complete.
 
 This program was developed using the DCPU toolchain at
 http://dcputoolcha.in/ -- mostly the command-line tools,
