@@ -2227,7 +2227,7 @@
                 JMP ROMAFA0
             IFN Y, 0x54  ; T
                 JMP ROMAFA0
-            JSR ROMFFB7
+            JSR ROMFFB7  ; get status
             JMP ROMBC3C
 :ROMAFA0    SET A, [RAM64]
             JMP MOVFM
@@ -2345,10 +2345,14 @@
             SET X, -1
             IFE EX, 0
                 SET X, 1
-:CMPDONE
-:ROMB072    ADD X, 1
-            SET A, X
+
+:CMPDONE    ; X is -1, 0, or 1
+:ROMB072    SET A, X
+            ADD A, 1
             shl A, 1
+            IFE A, 0
+            	BOR A, 1
+            ; A is 1, 2, or 4, respectively
             AND A, [RAM12]   ; comparison
             IFN A, 0
                 SET A, -1
