@@ -2309,28 +2309,31 @@
 :ROMB02E    SET [VALTYP], 0 ; result is numeric
             SUB [RAM4D], 1
             JSR ROMB6A6  ; get string length and address
-            SET [RAM61], A
-            SET [RAM62], X
-            SET A, [ARGHO+1]
-:ROMB041    JSR ROMB6AA ; allocate string memory
-            SET [RAM6C], X ; store string address
-            SET X, A
-            SUB A, [RAM61]
-            IFE A, 0
+            SET [RAM61], A  ; store string1 length
+            SET [RAM62], X  ; store string1 address
+            SET A, [RAM6C]
+:ROMB041    JSR FRETMP ; allocate string memory
+            SET [RAM6C], X ; store string2 address
+            SET X, A       ; store string2 length
+            SUB A, [RAM61] ; compare lengths
+            IFE A, 0       ; same length
                 JMP ROMB056
-            SET A, 1
-            IFE EX, -1
+            SET A, 1       
+            IFE EX, -1     ; different length
                 JMP ROMB056
-:ROMB056    SET [FACSGN], A
+			SET X, [RAM61] ; Only compare letters in common
+			SET A, -1
+:ROMB056    SET [FACSGN], A ; This value will be returned
+                            ; if all characters match.
+            ; Compare each character
             SET I, [RAM6C]
             SET J, [RAM62]
-:ROMB05B    ADD X, 1
-            ADD I, 1 ; INY to two vectors
-            ADD J, I
-            SUB X, 1
-            IFN X, 0
-                JMP ROMB066
-            SET X, [FACSGN]
+            ADD X, 1
+:ROMB05B    SUB X, 1
+            IFN X, 0  
+                JMP ROMB066 ; compare additional character
+            ; compared all characters, set result
+            SET X, [FACSGN] ; to whichever string is longer
 :NUMCMP  ; numeric compare (first draft)
 :ROMB061    SET I, [ARGHO+1]  ; ($6C),Y
             SET J, [FACHO]  ; ($62),Y
@@ -2339,12 +2342,12 @@
             SET C, 0
             JMP CMPDONE
 :ROMB066    SET A, [I]
-            SUB A, [J]
-            IFE A, 0
-                JMP ROMB05B
-            SET X, -1
-            IFE EX, 0
-                SET X, 1
+            STI B, [J]
+            IFE A, B        ; match
+                JMP ROMB05B ; next character
+            SET X, 1
+            IFG A, B
+                SET X, -1
 
 :CMPDONE    ; X is -1, 0, or 1
 :ROMB072    SET A, X
@@ -3019,10 +3022,10 @@
 :ROMB65D    JSR ROMB475 ; allocate memory, store len/ptr in A/X
             JSR MOVINS  ; move string in [RAM6F] to temporary string
             SET A, [DSCPNT]
-            JSR ROMB6AA ; set [INDEX] to [DSCPNT] then de-allocate 
+            JSR FRETMP ; set [INDEX] to [DSCPNT] then de-allocate 
             JSR ROMB68C ; copy that too.
             SET A, [RAM6F]
-            JSR ROMB6AA ; set [INDEX] to [RAM6F] then de-allocate
+            JSR FRETMP ; set [INDEX] to [RAM6F] then de-allocate
             JSR ROMB4CA ; save descriptor on stack
             JMP ROMADB8
 
@@ -3066,6 +3069,7 @@
 :FRESTR
 :ROMB6A3    JSR CHKSTR
 :ROMB6A6    SET A, [RAM64]
+:FRETMP
 :ROMB6AA    SET [INDEX], A
             JSR FRETMS   ; Move LASTPT to TEMPPT
             SET Y, [INDEX] ; though it's also in [INDEX]
@@ -3117,7 +3121,7 @@
             SET PUSH, Y
             JSR ROMB47D   ; allocate number of bytes in A
             SET A, [DSCPNT] ; get address
-            JSR ROMB6AA   ; Allocate string memory
+            JSR FRETMP   ; Allocate string memory
             SET Y, POP  ; pop address
             SET X, POP  ; pop starting index
             ADD [INDEX], X
