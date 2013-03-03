@@ -32,14 +32,14 @@ visible on the screen.  I've made this work with a custom font,
 but it means that this won't work with any text-mode emulators,
 if they exist.  
 
-A substantial fraction of the features work, but it's not useful
+A substantial fraction of the features work, but it's not complete
 yet.  Here's a mostly-complete list of things that will work
 mostly like they do on the C64:
 
 * Screen editing
 * Program entry
 * Immediate mode
-* BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, 
+* BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, ON,
                   NEW, STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT
 * BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$()
 * BASIC keyword abbreviations with shifted second letters
@@ -48,19 +48,32 @@ mostly like they do on the C64:
   and multiplication to 32-bit accuracy.
 * Floating point division to 16-bit accuracy, more for special
   cases like division by 5 or 3.
+* Comparison operators, NOT, AND, and OR.
 * String literals and concatenation.
 * Allocating, setting, and retrieving string variables like A$
 * Allocating, setting, and retrieving float variables like A
 
 Just about anything else won't work, and may even crash the machine.
-Even some of the above are useless due to a lack of supporting
-functions, or bugs.  It's rapidly becoming more complete.
+Here's what's missing, in the rough order of when I'm going to add it:
+* the functions MID$, ASC, and VAL
+* Arrays
+* Program storage (LOAD, SAVE, VERIFY)
+* Garbage collection
+* File access (OPEN, CLOSE, GET, GET#, INPUT#, PRINT#, CMD)
+* Exponents and logarithms (EXP, LOG, ^ operator)
+* POKE and PEEK (I'll need to stabilize the memory map first)
+* Trigonometry (SIN, COS, TAN, ATN)
+* Special variables ST, TI, TI$
+
+Additionally, the code needs to be optimized and cleaned up.
+Many speed gains are possible, though it may never be as fast
+as the original.  
 
 This program was developed using the DCPU toolchain at
 http://dcputoolcha.in/ -- mostly the command-line tools,
 since the DT IDE crashes on my PC and won't compile on my Mac.
-I've noticed it has trouble running on other implementations,
-but I haven't had time to investigate why yet.
+This program will run on any emulator that handles interrupts
+properly, even 0x10co.de.
 
 I've used the following online resources to make this work:
 
