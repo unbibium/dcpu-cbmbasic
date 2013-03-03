@@ -9,7 +9,9 @@
 
 JMP [ROMFFFC]   ; RESET vector
 
-; mostly testing stuff is here.
+; config.dasm16 is mostly useful for setting up
+; test parameters.
 .INCLUDE "config.dasm16"
 
+; kernal.dasm16 will link in all the ROM content
 .INCLUDE "kernal.dasm16"
