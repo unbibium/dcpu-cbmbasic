@@ -711,7 +711,7 @@
         SHL A, 8
         SET [FACHO], A ; Mantissa
         SET [FACHO+1], 0
-        SET X, 0x88
+        SET X, 0x88  ; needed for ROMBC49
         SET [FACEXP], X
 :ROMBC44
         SET A, [FACHO]
@@ -738,10 +738,10 @@
         SET [FACSGN], 0
         RTS
             
-
-;Compare FAC1 to Memory
-; returns: A = -1 if FAC1 is lower
-;              +1 if FAC1 is higher
+; ----------------------------------------------------------------------------
+; COMPARE FAC WITH PACKED # AT (Y,A)
+; RETURN A=1,0,-1 AS (Y,A) IS <,=,> FAC
+; ----------------------------------------------------------------------------
 :FCOMP
 :ROMBC5B    SET I, A    ; I points to exponent
 :FCOMPI
@@ -770,9 +770,9 @@
                 JMP ROMBC92
             ; try subtraction again,
             ; this time with the rounding bit
-:ROMBC88    SET EX, -1
-            IFB [FACOV], 0x8000
-                SET EX, 0
+:ROMBC88    SET EX, 0
+            IFU [FACOV], 0
+                SET EX, -1
 :ROMBC8C    SET X, [I+1]
 
             SBX X, [FACHO+1]
@@ -784,7 +784,7 @@
 :ROMBC92    SET A, [FACSGN]
             IFE EX, 0 ; no underflow in the subtract
                 XOR A, -1
-            JMP ROMBC31 ; return pure 0 or 1
+        	JMP ROMBC31 ; return pure 0 or 1
 
 ; ----------------------------------------------------------------------------
 ; QUICK INTEGER FUNCTION
