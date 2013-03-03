@@ -12,6 +12,7 @@
 :COUNT  DAT BLANK
 :RAM0C
 :DIMFLG DAT BLANK
+; todo: standardize the value stored here.
 :RAM0D
 :VALTYP DAT BLANK
 :RAM0E
@@ -157,6 +158,7 @@
 .DEFINE BASIC_FN_TOKEN 0xA5
 .DEFINE BASIC_NOT_TOKEN 0xA8
 .DEFINE BASIC_EQ_TOKEN 0xB2
+.DEFINE BASIC_GT_TOKEN 0xB1
 .DEFINE BASIC_LEFT_TOKEN 0xC8
 .DEFINE BASIC_SGN_TOKEN 0xB4
 .DEFINE BASIC_MINUS_TOKEN 0xAB
@@ -247,7 +249,7 @@
         DAT 0x7B
         DAT FDIVT   ; divide
         DAT 0x7F
-        DAT 0xBF7A   ; power
+        DAT ROMBF7B   ; power
         DAT 0x50
         DAT ROMAFE9   ; AND
         DAT 0x46
@@ -260,7 +262,7 @@
         DAT NOTOP   ; NOT
 :TBL_OP_COMPARE
         DAT 0x64
-        DAT ROMB016   ; greater / equal / less
+        DAT RELOPS   ; greater / equal / less
 
 
 ; table of commands
@@ -601,7 +603,7 @@
     ADD A, 52
     ADD A, STACK
     IFG A, SP
-        JMP ROMA435
+        JMP OMERR
     RTS
 
 ; array area overflow check
@@ -1070,7 +1072,7 @@
             SET PUSH, [CURLIN] ; push line number             ; +1
             SET A, BASIC_TO_TOKEN   ; TO token
             JSR SYNCHR
-            JSR ROMAD8D  ; left side of TO must be numeric
+            JSR CHKNUM  ; left side of TO must be numeric
             JSR FRMNUM   ; get number on right side of TO
             ; Compress FACSGN into FACHO;
             ; pushing only 3 words.
@@ -1375,7 +1377,7 @@
             SET A, POP ; VALTYP of variable...
             SHL A, 1
             SET C, EX
-            JSR ROMAD90  ; check that it's the correct type
+            JSR CHKVAL  ; check that it's the correct type
             ; Z flag was result of BIT $0D
             AND A, [VALTYP]
             IFN A, 0
@@ -1516,7 +1518,7 @@
             IFE A, 0x3B ; SEMICOLON
                 JMP ROMAB13
             JSR FRMEVAL
-            IFB [VALTYP], 0x80 ; string
+            IFU [VALTYP], 0    ; string
                 JMP ROMAA9A    ; print string and restart
             JSR FOUT    ; convert float to string
             JSR STRLIT  ; prepare string in memory
@@ -1738,7 +1740,7 @@
 :ROMAC4A    JSR ROMABF9 ; get line into input buffer
 :ROMAC4D    SET [RAM7A], X
 :ROMAC51    JSR CHRGET
-            IFC [VALTYP], 0x80 ; Numeric
+            IFA [VALTYP], -1 ; Numeric
                 JMP ROMAC89
             IFN [INPFLG], INF_GET ; BVC
                 JMP ROMAC65
@@ -1856,16 +1858,19 @@
 :FRMNUM
 :ROMAD8A    JSR FRMEVAL
 ; check value to be numeric
+:CHKNUM
 :ROMAD8D    IFU [VALTYP], 0
                 JMP ROMAD99
             RTS
+:CHKSTR
 ; check value to be string
 :ROMAD8F    IFA [VALTYP], -1
                 JMP ROMAD99
             RTS
-; this one will need a lot of testing
-; check value according to C flag
-:ROMAD90    IFC [VALTYP], 0xFF80
+; check that VALTYP matches C flag
+; (VALTYP is string if -1, C is string if >0)
+:CHKVAL
+:ROMAD90    IFU [VALTYP], 0
                 JMP ROMAD97
             IFN C, 0
                 JMP ROMAD99
@@ -1898,7 +1903,7 @@
             XOR B, 0xABAB
 ; check for comparison operators.  This is a loop so that
 ; the combinations <>, <=, and => work.
-:ROMADBC    SUB A, 0xB1 ; code for greater-than
+:ROMADBC    SUB A, BASIC_GT_TOKEN ; code for greater-than
             IFU A, 0
                 JMP ROMADD7
             IFA A, 2         ;CMP #3
@@ -1913,11 +1918,12 @@
             JSR CHRGET
             JMP ROMADBB  ; check for more comparison operators
             ; done detecting comparison operators
-:ROMADD7    IFN [OPMASK], 0  ; comparison operator exists
-                JMP ROMAE07
+:ROMADD7    SET X, [OPMASK] ; parameter for FRM_RELATIONAL
+			IFN X, 0  ; comparison operator exists
+                JMP FRM_RELATIONAL
             IFA A, -1 ; result from SUB above was positive
                 JMP ROMAE58
-            ADD A, 7  ; - 0xB1 + 7 = -0xAA
+            ADD A, BASIC_GT_TOKEN-BASIC_PLUS_TOKEN
             IFU A, 0   ; still less than 0
                 JMP ROMAE58
             IFE [VALTYP], 0
@@ -1926,50 +1932,70 @@
                 JMP CAT
 :ROMADE8    IFC A, 0x100 ; Carry bit clear in original
                 SUB A, 1
-            MUL A, 2  ; I think the 6502 version multiplied by 3
+            MUL A, 2 ; originally multiplied by 3
             ; Y now contains an index into the operator table.
             SET Y, A
             ; if we're on the right side of an operator,
             ; this POPs the precedence of that operator,
-            ; so we know whether to keep going.
+            ; so we know whether to keep going or just
+            ; return the value we have so far.
+:FRM_PRECEDENCE_TEST
 :ROMADF0    SET A, POP
-            ; TODO: re-examine this interpretation
             SET X, [TBL_OP+Y]
             SUB X, 1 ; testing for greater-or-equal
             IFG A, X
-                JMP ROMAE5D  ; pop stack into ARG and return
-            JSR ROMAD8D ; check that term is numeric
+                JMP FRM_PERFORM1  ; perform stacked operation
+            JSR CHKNUM ; check that term is numeric
 :ROMADF9    SET PUSH, A
             ; the value of Y should be set to
             ; a TBL_OP offset at this entry point
-:ROMADFA    JSR ROMAE20
+:ROMADFA    JSR FRM_RECURSE
 :ROMADFD    SET A, POP
-            IFC [OPPTR], 0x8000  ; positive in 8-bit
+			SET Y, [OPPTR]  ; = -1 on 6502 for compares
+			;DAT 0x5800
+            IFL Y, 0x80    ; BPL
                 JMP ROMAE19
             SET X, A
             IFE X, 0
-                JMP ROMAE5B
-            JMP ROMAE66         
+                JMP GOEX ; ROMAE5B ; pop ARG from stack and...?
+            JMP FRM_PERFORM2 ; perform stacked operation
+			; will return to address at top of stack
 
+; notes
+; 6502
+;          adfe     AE07     AE09         ae0b
+;  3=3              a=82     C=0          a=4
+;  "A"="A"          a=71     C=1          a=5
+;  "A"=3            a=82     C=1 $0d=7f   a=5
+;  3="A"            71        C=0          a=4
 ; handle comparison operators
 ; the first instruction here was LSR $0D, which I think was there
 ; to both set VALTYP to "numeric" for all future BMI tests, while
-; getting its carry bit from the low bit.  I'll have to investigate.
-:ROMAE07    SET C, [VALTYP]
-            SET [VALTYP], 0
-            SET A, [OPMASK]
-            SHL A, 1
-            AND C, 1
-            BOR A, C
+; getting its carry bit from the low bit
+; X should be 8, 4, or 2 depending on whether it's <, =, or >.
+:FRM_RELATIONAL
+:ROMAE07    SHR [VALTYP], 1
+			SET C, EX
+			SHR C, 15  ; C=1
+			SET B, [VALTYP]
+:ROMAE09    SHL X, 1
+            BOR X, C ; X = X*2 + C
 :ROMAE08    SUB [RAM7A], 1
             SET Y, TBL_OP_COMPARE-TBL_OP   ; point to ROMB016 
-            SET [OPMASK], A  ; ?
-            JMP ROMADF0
+            SET [OPMASK], X  ; to result of that ROMAE07 shuffle?
+            JMP FRM_PRECEDENCE_TEST
+
+; compare orders of precedence
+:PREFNC
 :ROMAE19    IFL A, [TBL_OP+Y]
                 JMP ROMADF9
-            JMP ROMAE66
+            JMP FRM_PERFORM2
             
-; recursive entry for evaluation of expression
+; ----------------------------------------------------------------------------
+; STACK THIS OPERATION AND CALL FRMEVL FOR
+; ANOTHER ONE
+; ----------------------------------------------------------------------------
+:FRM_RECURSE
 :ROMAE20    
             SET PUSH, [TBL_OP+1+Y] ; push operator for RTS
             JSR ROMAE33  ; push FAC onto stack
@@ -1999,16 +2025,27 @@
 ; Pop ARG from stack (4 WORDS)
 :ROMAE58    SET Y, -1
             SET A, POP
+:GOEX
 :ROMAE5B    IFE A, 0 ; oh wait, there's no operator
                 JMP ROMAE80
-            ; A contains a precedence level
-:ROMAE5D    IFE A, 0x64   ; comparison operator
-                JMP ROMAE64
-            JSR ROMAD8D ; check that term is numeric
+; ----------------------------------------------------------------------------
+; PERFORM STACKED OPERATION
+;
+; (A) = PRECEDENCE BYTE
+; STACK:  1 -- CPRMASK
+;	5 -- (ARG)
+;	2 -- ADDR OF PERFORMER
+; ----------------------------------------------------------------------------
+:FRM_PERFORM1
+:ROMAE5D    IFN A, 0x64   ; comparison operator
+                JSR CHKNUM 
 :ROMAE64    SET [OPPTR], Y
+:FRM_PERFORM2
 :ROMAE66    SET A, POP
+			SET C, A
+			AND C, 1  ; pass most significant bit as C for RELOPS
             SHR A, 1
-            SET [RAM12], A ; 
+            SET [RAM12], A ; store comparison result
             SET [ARGEXP], POP 
             SET [ARGHO], POP 
             SET [ARGHO+1], POP 
@@ -2202,7 +2239,7 @@
             JSR CHKOPN
             JSR FRMEVAL
             JSR CHKCOM
-            JSR ROMAD8F ; check value is string
+            JSR CHKSTR ; check value is string
             SET X, POP
             SET PUSH, [RAM64]
             SET PUSH, X
@@ -2219,7 +2256,7 @@
             SET C, FUNCTION_ROUTINES
 :ROMAFD6    ADD Y, FUNCTION_VECTOR
             JSR [Y]
-            JMP ROMAD8D ; check return is numeric
+            JMP CHKNUM ; check return is numeric
 
 ; OR/AND operators
 
@@ -2252,29 +2289,10 @@
 ; comparison operators...
 ; [VALTYP] refers to the type of the right-hand side
 ; C should refer to the type of the left-hand side
-; but right now it's always 1,
-; as these debug statements indicate
-:ROMB016    SET PUSH, C
-			SET PUSH, [VALTYP]
-			SET A, 13
-			JSR CHROUT
-			SET A, 67
-			JSR CHROUT
-			SET A, PICK 1
-			JSR LINPRT
-			SET A, 13
-			JSR CHROUT
-			SET A, 86
-			JSR CHROUT
-			SET A, PEEK
-			JSR LINPRT
-			SET [VALTYP], POP
-			SET C, POP
-			; C should be 1 if the other side was a
-            ; string expression, 0 otherwise.
-            JSR ROMAD90 ; make sure VALTYP matches C.
+:RELOPS
+:ROMB016    JSR CHKVAL ; make sure VALTYP matches C.
             IFN C, 0   ; string
-                JMP ROMB02E
+                JMP STRCMP
             SET A, [ARGSGN]
             BOR A, 0x7FFF
             AND A, [ARGHO]
@@ -2282,8 +2300,9 @@
             SET A, ARGEXP  ; pass pointer to FCOMP
             JSR FCOMP
             SET X, A
-            JMP ROMB061
-            ; string compare
+            JMP NUMCMP
+
+:STRCMP     ; string compare (incomplete)
 :ROMB02E    SET [VALTYP], 0 ; result is numeric
             SUB [RAM4D], 1
             JSR ROMB6A6  ; get string length and address
@@ -2309,12 +2328,13 @@
             IFN X, 0
                 JMP ROMB066
             SET X, [FACSGN]
+:NUMCMP  ; numeric compare (first draft)
 :ROMB061    SET I, [ARGHO+1]  ; ($6C),Y
-            SET J, [RAM62]  ; ($62),Y
-            IFB X, 0x8000
+            SET J, [FACHO]  ; ($62),Y
+            IFU X, 0 ; BMI
                 JMP ROMB072
             SET C, 0
-            JMP ROMB072
+            JMP CMPDONE
 :ROMB066    SET A, [I]
             SUB A, [J]
             IFE A, 0
@@ -2322,6 +2342,7 @@
             SET X, -1
             IFE EX, 0
                 SET X, 1
+:CMPDONE
 :ROMB072    ADD X, 1
             SET A, X
             shl A, 1
@@ -2456,7 +2477,7 @@
 ; Compute pointer to array body
 
 :ROMB194    SET A, [COUNT]
-            ADD A, 5    ; why 5?
+            ADD A, 3
             ADD A, [RAM5F]
             SET [RAM58], A  ; End of destination
             RTS
@@ -2473,7 +2494,7 @@
         ; to a positive integer
 :ROMB1B2    JSR CHRGET
 :ROMB1B5    JSR FRMEVAL
-:ROMB1B8    JSR ROMAD8D  ; check that term is numeric
+:ROMB1B8    JSR CHKNUM  ; check that term is numeric
             IFG [FACSGN], 0x7F  ; check that it is positive
                 JMP FCERR
 ; convert float to integer
@@ -2514,9 +2535,37 @@
             JMP BSERR
         JMP ROMB2EA
 
+; allocate array
+:ROMB261	JSR ROMB194
+			JSR REASON
+			SET EX, 0xB267
+			JMP CRASH
+
 ; compute reference to array element
-:ROMB2EA    SET EX, 0xB2EA
-            JMP CRASH
+:ROMB2EA    SET Y, [RAM5F]
+			SET A, [Y]
+			SET [RAM0B], A
+			SET [RAM71], 0
+			ADD Y, 1
+			SET A, POP
+			SET [RAM64], A
+			IFL A, [Y]
+    			JMP ROMB30E
+  			JMP BSERR ; ?BAD SUBSCRIPT
+:ROMB30B	JMP OMERR   ;?OUT OF MEMORY
+:ROMB30E	IFE [RAM71], 0
+				JMP ROMB320
+			JSR ROMB34C
+			SET EX, 0xB30E
+			JMP CRASH
+:ROMB320	SET EX, 0xB320
+			JMP CRASH
+:ROMB34B	RTS
+
+
+; XY = XA = length * limit from array data
+:ROMB34C	SET EX, 0xB34C
+			JMP CRASH
 
 ; fre(0)
 :ROMB37D    IFN [VALTYP], 0
@@ -2552,7 +2601,7 @@
             SET [RAM10], A
             JSR ROMB092 ; within PTRGET.
             SET [DEFPNT], A
-            JMP ROMAD8D ; check that term is numeric
+            JMP CHKNUM ; check that term is numeric
             
 ; expand FN call
 :FNDOER
@@ -2560,7 +2609,7 @@
             SET EX, 0xB3F4
             JMP CRASH
 :STRD
-:ROMB465    JSR ROMAD8D ; arg must be numeric
+:ROMB465    JSR CHKNUM ; arg must be numeric
             SET Y, FLOATSTR-1
             JSR ROMBDDF   ; FOUT+1
             SET A, POP  ; originally 2x PLA
@@ -2840,7 +2889,7 @@
 :ROMB63D    ; DEBUG STACK POINTER
             SET PUSH, [RAM64]
             JSR EVAL
-            JSR ROMAD8F ; check that value is string
+            JSR CHKSTR ; check that value is string
             SET [RAM6F], POP
             SET Y, [RAM6F]
             SET A, [Y]  ; Get length of first string
@@ -2898,8 +2947,7 @@
 ;    and a length in A
 
 :FRESTR
-:ROMB6A3    ; [VALTYP] should be 0x80
-            JSR ROMAD8F  ; check that value is string
+:ROMB6A3    JSR CHKSTR
 :ROMB6A6    SET A, [RAM64]
 :ROMB6AA    SET [INDEX], A
             JSR FRETMS   ; Move LASTPT to TEMPPT
@@ -2994,11 +3042,11 @@
             SET [DSCPNT], Y
             JMP X
 
-; LEN function - valtyp should be String.
+; LEN function 
 :ROMB77C    JSR ROMB782
             JMP GIVAYF
             
-:ROMB782    JSR ROMB6A3  ; get length in A
+:ROMB782    JSR FRESTR  ; get length in A
             SET [VALTYP], 0 ; returning a number
             SET Y, A     
             RTS
