@@ -35,6 +35,7 @@
 .DEFINE CBM_QUOTE 0x22
 .DEFINE CBM_COMMA 0x2C
 .DEFINE CBM_COLON 0x3A
+.DEFINE CBM_RUN 0x83
 
 
 :ROMA000    DAT ROME394     ; Vector for starting BASIC
@@ -557,7 +558,7 @@
             IFE [BLNON], 0  ; last blink was off
                 JMP ROMEA5C
             SET [GDBLN], [A] ; store chr under cursor
-            JSR ROMEA24
+            ;JSR ROMEA24
             SET Y, [COLOR]
             SET X, Y
             AND Y, 0x0F00
@@ -864,7 +865,7 @@ RTS
 :ROME759    JSR ROME8A1 ; move cursor to prev line if at start
     ; Move rest of line to the left with the cursor.
             SUB Y, 1
-            JSR ROMEA24
+            ;JSR ROMEA24
             SET [PNTR], Y
             SET I, [PNT]
             SET J, [PNT]  ; J = end of line
@@ -1069,7 +1070,7 @@ RTS
             ADD X, 1
             JMP ROME582
 :ROME58C    SET [LNMX], A ; maximum line length
-                JMP ROMEA24
+            ;JMP ROMEA24
             RTS
 :ROME591    IFN X, [LXSP]
                 RTS
@@ -1104,7 +1105,7 @@ RTS
             ADD A, [PNTR]
             SET [A], [GDBLN]  ; was a call to EA13
 :ROME5E7    JSR ROME5B4 ; get character from buffer
-            IFN A, 0x83 ; RUN key
+            IFN A, CBM_RUN ; RUN key
                 JMP ROME5FE
             ; copy LOAD and RUN into buffer
             ;SET X, 9
@@ -1935,6 +1936,8 @@ RTS
     HWI [KEYBOARD]
     SET [DEBUGINT+4], C
     BOR [DEBUGINT+4], 0xA200
+    IFG C, 0x9F ; strange high ascii in 0x10co.de
+        JSR HIGHASCII
     IFL C, 0x90
         SET [KEYASCII], C ; for scanning during clock interrupt
     SET B, -1
@@ -1950,6 +1953,19 @@ RTS
     SET C, POP
     SET B, POP
     RFI
+
+; 0x10co.de + chrome gives us strange keystrokes
+; where it adds 0x80 to them. this fixes most of them
+; I hesitate to do anything else due to the probability
+; that it won't work on non-US keyboards.
+:HIGHASCII
+	SET A, C
+	SUB A, 0x80
+	IFC [KEYSHIFT], 1
+	  IFL A, 0x40
+		XOR A, 0x10 ; change ,-.? to <=>?
+	SET C, A
+	RTS
 
 :CBM_PALETTE
     DAT 0x000, 0xfff, 0xf00, 0x0ff
