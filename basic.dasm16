@@ -1007,7 +1007,7 @@
             ; loop to print a line
 :ROMA6F3    JSR ROMAB47 ; print character
             IFE A, CBM_QUOTE
-            BOR [RAM0F], -1 ; enter quote mode
+            XOR [RAM0F], -1 ; enter quote mode
             ADD Y, 1
             ;IFE Y, 0  ; what, stop after 256 characters?
             ;   JMP ROMA714
@@ -1070,7 +1070,7 @@
 :ROMA753    SET A, POP ; discard JSR
             SET A, 11   ; test for this many bytes available
             JSR GETSTK
-            JSR ROMA906 ; get end of statement
+            JSR DATAN ; get end of statement
             SET PUSH, I        ; push first statement in loop ; +1
             SET PUSH, [CURLIN] ; push line number             ; +1
             SET A, BASIC_TO_TOKEN   ; TO token
@@ -1237,7 +1237,7 @@
 
 :STMT_GOTO
 :ROMA8A0    JSR LINGET  ; get target line
-            JSR ROMA909  ; Set I to the 0 at the end of this line
+            JSR REMN  ; Set I to the 0 at the end of this line
             SET A, I ; start at next line
             ADD A, 1 ; skip over null 
             IFG [CURLIN], [LINNUM]
@@ -1272,7 +1272,7 @@
             SET [RAM7A], POP
 
 :STMT_DATA
-:ROMA8F8    JSR ROMA906 ; get end of statement
+:ROMA8F8    JSR DATAN ; get end of statement
             ; instead of returning number to add in Y,
             ; returns complete address in I.
 :ROMA8FB        SET [RAM7A], I
@@ -1283,9 +1283,11 @@
 ; (original returned number to add in Y)
 ; There's a way to use registers instead of ENDCHR and CHARAC,
 ; but when I try, program entry breaks somehow.
+:DATAN
 :ROMA906    SET [CHARAC], CBM_COLON   ; get next statement
-                JMP ROMA90D
-:ROMA909    SET [CHARAC], 0     ; get end of line
+        	IFE 1, 0 ; skip
+:REMN
+:ROMA909    SET [CHARAC], 0           ; get end of line
 :ROMA90D    SET I, [RAM7A]
             SET [ENDCHR], 0
             SET Z, 0
@@ -1317,7 +1319,7 @@
                 JMP ROMA940
 
 :STMT_REM
-:ROMA93B    JSR ROMA909 ; get end of line
+:ROMA93B    JSR REMN ; get end of line
             JMP ROMA8FB ; was BEQ
 
 :STMT_THEN
@@ -1704,7 +1706,7 @@
             SET A, [CHANNL]
             IFN A, 0
                 JMP ROMABD6
-            JSR ROMA906 ; get end of line in I
+            JSR DATAN ; get end of line in I
             JMP ROMA8FB ; ... = I, next statement.
 
 ; get line into input buffer
@@ -1781,7 +1783,7 @@
             JSR CHKCOM       ; OR, comma
             JMP ROMAC15      ; followed by another variable
 ; find next DATA statement
-:ROMACB8    JSR ROMA906 ; get next statement in I
+:ROMACB8    JSR DATAN ; get next statement in I
 ; todo: finish this I pointer's trek through the program
             ADD I, 1 
             IFN A, 0
