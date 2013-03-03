@@ -1278,27 +1278,26 @@
 :ROMA8FB        SET [RAM7A], I
             RTS
 
-; todo: should the I point to the zero or the
-; character after the zero?
 ; GET END OF LINE
 ; returns address of next line in I, ready for RAM7A.
 ; (original returned number to add in Y)
+; There's a way to use registers instead of ENDCHR and CHARAC,
+; but when I try, program entry breaks somehow.
 :ROMA906    SET [CHARAC], CBM_COLON   ; get next statement
                 JMP ROMA90D
 :ROMA909    SET [CHARAC], 0     ; get end of line
 :ROMA90D    SET I, [RAM7A]
             SET [ENDCHR], 0
-:ROMA911    SET A, [ENDCHR]
-            SET X, [CHARAC]
-:ROMA915    SET [CHARAC], A
-            SET [ENDCHR], X
-:ROMA919    SET A, [I] 
             SET Z, 0
+:ROMA911    SET A, [ENDCHR]    ; swap CHARAC and ENDCHR
+            SET [ENDCHR], [CHARAC]
+            SET [CHARAC], A
+:ROMA919    SET A, [I] 
             IFE A, 0
                 SET Z, 1
             IFE A, 0
                 RTS
-:ROMA91D    IFE A, 8
+:ROMA91D    IFE A, [ENDCHR]
                 RTS
             ADD I, 1
             IFE A, CBM_QUOTE ; quote mark
