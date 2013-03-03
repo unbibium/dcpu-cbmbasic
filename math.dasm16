@@ -377,7 +377,7 @@
 ; also check for overflow and set result sign
 :MULDIV
 :ROMBAB7    SET A, [ARGEXP]
-            IFE A, 0
+:ROMBAB9    IFE A, 0
                 JMP ROMBADA ; just copy I guess
             ADD A, [FACEXP]
             IFC A, 0x100 ; BCC
@@ -682,7 +682,7 @@
             IFE EX, 0
                 RTS
             ; increment mantissa
-            ADD [FACHO+1], 1
+:ROMBC23    ADD [FACHO+1], 1
             ADX [FACHO], 0  
             IFE EX, 0
                 RTS
@@ -1186,6 +1186,36 @@
     DAT 0x0000,0x003C
 :FDCENDEND
 
+; power operator
+:ROMBF7B	IFE Z, 1  ; ???
+				JMP ROMBFED
+			SET A, [ARGEXP]
+			IFE A, 0
+				JMP ROMB8F7 ; return 0
+			SET X, RAM4E
+			JSR ROMBBD4 ; round FAC1 and move to RAM4E
+			SET A, [RAM6E]
+			IFA A, 0 ; BPL
+				JMP ROMBF9E
+			SET A, RAM4E
+			JSR ROMBC5B
+			IFE Z, 0
+				JMP ROMBF9E
+			SET A, Y
+			SET Y, [RAM07]
+:ROMBF9E	JSR MOVFA ; TODO: original called ROMBBFE.
+					; was this just for efficiency?
+			SET PUSH, Y
+			JSR LOG
+			SET A, RAM4E
+			JSR FMULT   ; FAC *= RAM4E
+			JSR ROMBFED ; EXP function
+			SET A, POP
+			ASR A, 1
+			IFE EX, 0
+				RTS
+			
+
 ; MINUS operator
 ; Perform NOT and >
 :NEGOP
@@ -1194,10 +1224,60 @@
             XOR [FACSGN], -1
             RTS
 
+; float constants for EXP
+
+; 1/LOG(2)
+:ROMBFBF	DAT 0x81, 0x38aa, 0x3b29
+; polynomial table
+:ROMBFC4	DAT 7 ; degree 8
+			DAT 0x71,0x3458,0x3e56
+			dat 0x74,0x167e,0xb31b
+			dat 0x77,0x2fee,0xe385
+			dat 0x7a,0x1d84,0x1c2a
+			dat 0x7c,0x6359,0x580a
+			dat 0x7e,0x75fd,0xe7c6
+			dat 0x80,0x3172,0x1810
+			dat 0x81,0,0
+
 ; EXP command
-:ROMBFED    SET EX, 0xBFED
-            SET C, PC
-            JMP CRASH
+:ROMBFED    SET A, ROMBFBF
+			JSR FMULT
+			SET A, [RAM70]
+			ADD A, 0x50 ; wat?
+			IFL A, 0x100
+				JMP ROME000
+			JSR ROMBC23
+:ROME000	SET [RAM56], A
+			JSR ROMBC0F
+			IFG [FACEXP], 0x87 ; FAC >= 256
+:ROME00B		JSR ROMBAD4
+			JSR ROMBCCC
+			SET A, [RAM07]
+			ADD A, 0x81
+			IFC A, 0xFF ; BEQ in 8-bit
+				JMP ROME00B
+			SUB A, 1
+			SET PUSH, A
+			; Swap FAC and ARG
+			SET A, [FACEXP]
+			SET X, [FACHO]
+			SET Y, [FACHO+1]
+			SET [FACEXP], [ARGEXP]
+			SET [FACHO], [ARGHO]
+			SET [FACHO+1], [ARGHO+1]
+			SET [ARGEXP], A
+			SET [ARGHO], X
+			SET [ARGHO+1], Y
+			SET [RAM70], [RAM56]
+			JSR FSUBT
+			JSR NEGOP
+			SET A, ROMBFC4 ; EXP polynomial table
+			JSR ROME059
+			SET [ARISGN], 0
+			SET A, POP
+			JSR ROMBAB9 ; add FAC/ARG exponents
+			RTS	
+			
 
 ; float numbers for RND
 :ROME08D	DAT 0x98, 0x3544, 0x7A00
