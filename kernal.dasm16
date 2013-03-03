@@ -1,26 +1,12 @@
-
-
-; todo: use a bunch of IFDEFs to hide all the debugging code
-; when HW_ROWS >= 12.
-
+;----------------
+;  KERNAL MAIN
+;----------------
 
 ; I used to use a FILL here but this made the hex dump too
 ; large to paste into web forms.
 .DEFINE BASICMEMEND BASICMEM+38912
 
-; keyboard constants
-.DEFINE DCPU_BACKSPACE 0x10
-.DEFINE DCPU_RETURN 0x11
-.DEFINE DCPU_INSERT 0x12
-.DEFINE DCPU_DELETE 0x13
-.DEFINE DCPU_UP 0x80
-.DEFINE DCPU_DOWN 0x81
-.DEFINE DCPU_LEFT 0x82
-.DEFINE DCPU_RIGHT 0x83
-.DEFINE DCPU_SHIFT 0x90
-.DEFINE DCPU_CTRL 0x91
-.DEFINE DCPU_STOP 0x1B
-
+; PETSCII constants
 .DEFINE CBM_STOP 0x03
 .DEFINE CBM_RETURN 0x0D
 .DEFINE CBM_DELETE 0x14
@@ -45,6 +31,9 @@
 ;
 
 .INCLUDE "basic.dasm16"
+.INCLUDE "keyboard.dasm16"
+; TODO: separate screen editor into its own file
+
 
 :RAM90
 :STATUS DAT 0
@@ -52,8 +41,6 @@
 :MSGFLG DAT 0           
 
 
-:RAM91 ; stop key flag
-:STKEY  DAT 0
 :RAM93  
 :VERCK  DAT 0
 :RAM97
@@ -62,10 +49,6 @@
 :DFLTN  DAT 0
 :RAM9A  
 :DFLTO  DAT 3
-:RAMC5  ; Code of last key pressed
-:LSTX   DAT 0
-:RAMC6  ; Number of Characters in Keyboard Queue
-:NDX    DAT 0
 :RAMC7 ; Reverse text? 0=no
 :RVS    DAT 0
 :RAMC8 ; Pointer: end of logical line for input
@@ -228,8 +211,6 @@
 :RAM032C    DAT DEF_CLALL
 :RAM033C    DAT 0
 
-
-
 :SCREENMEM    
                .FILL HW_COLS*HW_ROWS BLANK
 :SCREENMEMEND
@@ -252,6 +233,8 @@
 
           .FILL HW_COLS-29 0xA02E
 
+; TODO: use preprocessor to hide all the debugging code
+; when HW_ROWS >= 12.
 
 ; Error handler for IO calls
 :ROME0F9    IFN A, 0xF0
@@ -576,165 +559,6 @@
             SET X, POP
             SET EX, POP
             RFI
-
-:SCANREG
-:SCANSHIFT
-    SET Y, [KEYASCII]
-    IFL Y, 0x20
-        JMP SCANSPECIAL
-    IFB Y, 0x80
-        JMP SCANARROWS
-    SET [SFDX], Y
-    ; handle letter shifting
-    IFG Y, 0x60 ; lowercase letters
-        SUB [SFDX], 0x20  ; are "unshifted"
-    IFG Y, 0x40
-      IFL Y, 0x5B
-        ADD [SFDX], 0x80
-    RTS
-
-:SCANSPECIAL
-    SET [SFDX], CBM_RETURN
-    IFE Y, DCPU_INSERT
-        SET [SFDX], CBM_INSERT
-    IFE Y, DCPU_BACKSPACE
-		JMP SCAN_DELETE
-    IFN Y, DCPU_DELETE
-    	JMP SCAN_NOT_DELETE
-:SCAN_DELETE
-	IFC [SHFLAG], 1  ; unshifted
-        SET [SFDX], CBM_DELETE
-	IFB [SHFLAG], 1  ; shifted
-        SET [SFDX], CBM_INSERT
-:SCAN_NOT_DELETE
-    RTS
-
-:SCANCTRL
-    SET [SFDX], CBM_RETURN
-    RTS
-
-:SCANCBM
-    RTS
-
-:SCANARROWS
-    IFE Y, DCPU_RIGHT
-        SET [SFDX], CBM_RIGHT 
-    IFE Y, DCPU_DOWN
-        SET [SFDX], CBM_DOWN 
-    IFE Y, DCPU_LEFT
-        SET [SFDX], CBM_LEFT
-    IFE Y, DCPU_UP
-        SET [SFDX], CBM_UP 
-    RTS
-            
-; scan keyboard
-:ROMEA87 
-    JSR DISPLAY_INPUT_BUFFER    
-    SET [SHFLAG], [KEYSHIFT]
-    SET [SFDX], 0x407F ; code for NO KEY PRESSED
-        IFE [KEYASCII], 0
-            JMP ROMEAE0
-        IFC [KEYSHIFT], 0x07 ; no shift-ctrl
-        JSR SCANREG
-    IFE [KEYSHIFT], 0x01 ; SHIFT only
-        JSR SCANSHIFT
-    IFE [KEYSHIFT], 0x04 ; CTRL only
-        JSR SCANCTRL
-    IFE [KEYSHIFT], 0x05 ; CBM (shift+ctrl)
-        JSR SCANCBM
-        JSR DISPLAY_KEY_DEBUG
-        ;JSR DISPLAY_LINK_TABLE
-:ROMEAE0
-    SET Y, [SFDX] ; key being pressed
-        SET A, Y   ; [SFDX] contains the actual value, not scan code
-        SET X, A   ; because EAE4 said so
-    IFE [SFDX], [LSTX]
-        JMP ROMEAF0
-    SET [RAM028C], REPEAT_FRAMES_A   ; key repeat speed
-;   SET [RAM028B], REPEAT_FRAMES_B   ; key repeat speed
-    JMP ROMEB26
-:ROMEAF0 
-    ; clear shift bit so that we can test for
-    ; a character and its shifted equivalent
-    ; at the same tims.
-        AND A, 0x407F
-:ROMEAF2
-    ; handle key repeat logic
-    IFB [RAM028A], 0x80
-        JMP ROMEB0D ; repeat all characters
-    IFB [RAM028A], 0x40
-        RTS        ; repeat no characters
-    IFB A, 0x4000  ; no key pressed
-        JMP ROMEB26
-    ; repeat only these characters
-    IFE A, CBM_DELETE  ;and insert
-        JMP ROMEB0D
-    ; no need to software-repeat the space
-    ; the dcpu does it for us?
-    ;IFE A, 0x20 ; SPACE
-    ;    JMP ROMEB0D
-    IFE A, CBM_RIGHT ; cursor right/left
-        JMP ROMEB0D
-    IFN A, CBM_DOWN ; cursor up/down
-        RTS
-:ROMEB0D ; repeat this key
-    IFE [RAM028C], 0
-        JMP ROMEB17
-    SUB [RAM028C], 1
-    IFN [RAM028C], 0
-        RTS
-:ROMEB17
-    SUB [RAM028B], 1
-    IFN [RAM028B], 0
-        RTS
-:ROMEB1C    SET [RAM028B], REPEAT_FRAMES_B ; repeat speed
-:ROMEB21   
-            SET Y, [NDX]
-            SUB Y, 1
-            IFC Y, 0x8000 ; BPL
-                RTS
-:ROMEB26
-            SET [LSTX], [SFDX]
-            IFN [LSTSHF], [0x01]
-                JMP SKIPSHIFTCBM
-            IFE SHFLAG, 0x05
-                ;JSR TOGGLEFONT ; why doesn't this work
-:SKIPSHIFTCBM
-            SET [LSTSHF], [SHFLAG]
-            IFB A, 0x4000 ; no key pressed
-                RTS
-:ROMEB35
-            SET X, [NDX]
-            IFG X, KEYBOARD_BUFFER_SIZE  ; keyboard buffer overflow
-                RTS
-:ROMEB3C    ; Add A to keybuard queue
-            SET [KEYD+X], A
-            ADD [NDX], 1
-:ROMEB47
-            RTS
-
-:DISPLAY_INPUT_BUFFER
-    SET PUSH, X
-    SET PUSH, I
-    SET PUSH, J
-    SET I, [FREETOP]
-    SET J, DEBUGLNK-1
-:BUFLOOP
-    STI X, [I]
-    IFC X, 0xFF00
-        JMP BUF99
-    AND X, 0xFF
-    BOR X, 0xB300
-    JMP BUF88
-:BUF99
-    BOR X, 0x6E00
-:BUF88 SET [J], X
-    IFL J, DEBUGLNK+15
-    JMP BUFLOOP
-    SET J, POP
-    SET I, POP
-    SET X, POP
-RTS
 
 ; I appropriated this to display another
 ; chunk of memory in the status bar.
@@ -1909,63 +1733,6 @@ RTS
 ; XOR masks to toggle graphics-uppercase 
 :FONTXOR2
     .FILL 52 BLANK
-
-; Handle keyboard interrupts by storing keystrokes in
-; special RAM locations, where they'll be picked up by 
-; the clock interrupt.
-:KEYASCII .DAT 0
-
-; 0x01: shift
-; 0x05: control
-; this doesn't work on any known implementation yet
-:KEYSHIFT .DAT 0
-
-:KEYINT
-    SET PUSH, B
-    SET PUSH, C
-    SET A, 2 ; check key
-    SET B, DCPU_CTRL
-    HWI [KEYBOARD]
-	SHL C, 2  
-	SET [KEYSHIFT], C
-    SET A, 2 ; check key
-    SET B, DCPU_SHIFT
-    HWI [KEYBOARD]
-    BOR [KEYSHIFT], C
-    SET A, 1  ; get from queue
-    HWI [KEYBOARD]
-    SET [DEBUGINT+4], C
-    BOR [DEBUGINT+4], 0xA200
-    IFG C, 0x9F ; strange high ascii in 0x10co.de
-        JSR HIGHASCII
-    IFL C, 0x90
-        SET [KEYASCII], C ; for scanning during clock interrupt
-    SET B, -1
-    IFE C, DCPU_STOP
-    	SET B, 0x7F
-    SET [RAM91], B
-    ;SET A, 2 ; check key
-    ;SET B, [KEYASCII] ; original key
-    ;; check for key-up event here
-    ;HWI [KEYBOARD]
-    ;IFE C, 0
-    ;    SET [KEYASCII], 0
-    SET C, POP
-    SET B, POP
-    RFI
-
-; 0x10co.de + chrome gives us strange keystrokes
-; where it adds 0x80 to them. this fixes most of them
-; I hesitate to do anything else due to the probability
-; that it won't work on non-US keyboards.
-:HIGHASCII
-	SET A, C
-	SUB A, 0x80
-	IFC [KEYSHIFT], 1
-	  IFL A, 0x40
-		XOR A, 0x10 ; change ,-.? to <=>?
-	SET C, A
-	RTS
 
 :CBM_PALETTE
     DAT 0x000, 0xfff, 0xf00, 0x0ff
