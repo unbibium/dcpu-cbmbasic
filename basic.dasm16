@@ -42,7 +42,8 @@
     .FILL 10 BLANK
 :TEMPSTEND
 :RAM22
-:INDEX  DAT 0, 0
+:INDEX  DAT BLANK, BLANK
+:RAM28  DAT BLANK
 :RESHO ; multiplication argument - mantissa only
 :RAM26  DAT 0
 :RAM27  DAT 0, 0
@@ -101,6 +102,8 @@
 :FOUR6
 :RAM53  DAT 0
 :RAM55  DAT 0
+:RAM59
+:HIGHDS DAT 0
 :FBUFPT ; Series Evaluation Pointer
 :RAM71  DAT 0
 
@@ -178,13 +181,13 @@
             DAT STMT_DATA
             DAT STMT_INPUTN
             DAT STMT_INPUT 
-            DAT 0xB080   ; 
+            DAT STMT_DIM 
             DAT STMT_READ  
             DAT STMT_LET   
             DAT STMT_GOTO  
             DAT STMT_RUN   
             DAT STMT_IF
-            DAT STMT_RESTORE   ; restore
+            DAT STMT_RESTORE
             DAT STMT_GOSUB 
             DAT STMT_RETURN
             DAT STMT_REM   
@@ -2319,7 +2322,7 @@
             IFE EX, -1
                 JMP ROMB056
 :ROMB056    SET [FACSGN], A
-            SET I, [ARGHO+1]
+            SET I, [RAM6C]
             SET J, [RAM62]
 :ROMB05B    ADD X, 1
             ADD I, 1 ; INY to two vectors
@@ -2350,6 +2353,14 @@
             IFN A, 0
                 SET A, -1
             JMP ROMBC3C
+
+:ROMB07E	JSR CHKCOM
+:STMT_DIM	SET X, A
+			JSR ROMB090
+			JSR CHRGOT
+			IFE Z, 0
+				JMP ROMB07E
+			RTS
             
 
 ;get name and pointer to a variable.
@@ -2359,7 +2370,7 @@
 :PTRGET
 :ROMB08B    SET X, 0
             JSR CHRGOT
-            SET [DIMFLG], X
+:ROMB090    SET [DIMFLG], X
 :ROMB092    SET [VARNAM], A ; store first letter of variable
             ; throw SYNTAX if first character is not a letter.
             JSR CHRGOT
@@ -2475,7 +2486,7 @@
             
 
 ; Compute pointer to array body
-
+:GETARY
 :ROMB194    SET A, [COUNT]
             ADD A, 3
             ADD A, [RAM5F]
@@ -2514,8 +2525,50 @@
 ;element of the array are set.  If it is not found, the array is
 ;created, and the pointers set.
 :ISARY
-:ROMB1D1    SET EX,0xB1D1
-            JMP CRASH
+:ROMB1D1    SET A, [DIMFLG]
+			BOR A, [INTFLG]
+			SET PUSH, A
+			SET A, [VALTYP]
+			SET PUSH, A
+			SET Y, 0
+:ROMB1DB	SET PUSH, Y  ; push... subscript?
+			SET PUSH, [VARNAM]
+			SET PUSH, [VARNAM+1]
+			JSR INTIDX ; get subscript
+			SET [VARNAM+1], POP
+			SET [VARNAM], POP
+			SET Y, A
+			; swap address out
+			SET B, PICK 1
+			SET PICK 1, [RAM64]
+			SET PEEK, B
+			ADD Y, 1 ; ?
+			JSR CHRGOT
+			IFE A, CBM_COMMA
+			    JMP ROMB1DB
+			SET [COUNT], Y
+			JSR CHKCLS
+			SET [VALTYP], POP
+			SET [INTFLG], POP
+			AND A, 0x7F
+			SET [DIMFLG], A
+; ----------------------------------------------------------------------------
+; SEARCH ARRAY TABLE FOR THIS ARRAY NAME
+; ----------------------------------------------------------------------------
+			SET A, [ARYTAB]
+:ROMB21C	SET [RAM5F], A    ; todo: optimize away RAM5F?
+			; checked all variables
+			IFE [RAM5F], [STREND]
+				JMP MAKE_NEW_ARRAY
+			SET Y, [RAM5F]
+			; check for name match
+			IFE [VARNAM], [Y]
+			    IFE [VARNAM+1], [Y+1]
+			        JMP USE_OLD_ARRAY
+			SET A, [Y+2]  ; get size of current item
+			ADD A, Y      ; derive location of next item
+			JMP ROMB21C
+			
 
 :BSERR
 :ROMB245    SET X, 0x12 ; ?BAD SUBSCRIPT
@@ -2523,28 +2576,65 @@
 :FCERR
 :ROMB248    SET X, 0x0E ; ?ILLEGAL QUANTITY
             JMP ERROR
+            
+:USE_OLD_ARRAY
 :ROMB24D    SET X, 0x13 ; ?REDIM'D ARRAY
-            IFN [RAM0C], 0
+            IFN [DIMFLG], 0
                 JMP ERROR
-            JSR ROMB194
-
-:ROMB256    SET A, [RAM0B]
-        SET Y, 4
-        ADD Y, [RAM5F]
-        IFN A, [Y]
-            JMP BSERR
-        JMP ROMB2EA
+            JSR GETARY
+:ROMB256    SET A, [COUNT]
+			SET Y, 3  ; index to ...?
+			ADD Y, [RAM5F]
+			IFN A, [Y]
+				JMP BSERR
+			JMP FIND_ARRAY_ELEMENT
 
 ; allocate array
-:ROMB261	JSR ROMB194
+:MAKE_NEW_ARRAY
+:ROMB261	JSR GETARY
 			JSR REASON
-			SET EX, 0xB267
-			JMP CRASH
-
+			SET [RAM71], 0
+			SET Y, [RAM5F]
+			SET X, 5 ; NOT an error number
+			SET A, [VARNAM]
+			SET [Y], A
+			IFB A, 0x80 ; if type bit set
+			    SUB X, 1
+			SET A, [VARNAM+1]
+			SET [Y+1], A
+			IFB A, 0x80 ; if type bit set
+			    SUB X, 1 ; was 2 in thingy
+			SET [RAM71], X
+			SET [Y+3], [COUNT]  ; Size of array?
+:ROMB286	SET X, [COUNT]
+			SET A, 0
+			IFC [RAM0C], 0x40
+				JMP ROMB296
+			SET X, POP
+			ADD X, 1
+:ROMB296	SET [Y+4], X
+			JSR MULTIPLY_SUBSCRIPT
+			SET [RAM71], X
+			SET Y, [INDEX]
+			SUB [COUNT], 1
+			IFN [COUNT], 0
+				JMP ROMB286
+			ADD X, [HIGHDS]  ; $59
+			; crazy math here
+            SET EX, 0xb2ac
+            JMP CRASH	
+:L30BD
+            JSR REASON
+            SET [STREND], A
+            SET A, 0
+            ; crazy math here
+            SET EX, 0xB2C2
+            JMP CRASH			
 ; compute reference to array element
+:FIND_ARRAY_ELEMENT
 :ROMB2EA    SET Y, [RAM5F]
 			SET A, [Y]
-			SET [RAM0B], A
+			SET [COUNT], A
 			SET [RAM71], 0
 			ADD Y, 1
 			SET A, POP
@@ -2555,7 +2645,7 @@
 :ROMB30B	JMP OMERR   ;?OUT OF MEMORY
 :ROMB30E	IFE [RAM71], 0
 				JMP ROMB320
-			JSR ROMB34C
+			JSR MULTIPLY_SUBSCRIPT
 			SET EX, 0xB30E
 			JMP CRASH
 :ROMB320	SET EX, 0xB320
@@ -2564,18 +2654,41 @@
 
 
 ; XY = XA = length * limit from array data
-:ROMB34C	SET EX, 0xB34C
-			JMP CRASH
+; todo: optimize away RAM5D and maybe RAM28
+:MULTIPLY_SUBSCRIPT
+:ROMB34C	SET [INDEX], Y
+			SET [RAM28], [Y] ; was two 8-bit halves
+			SET [RAM5D], 0x10
+			SET X, 0
+:ROMB35F	SHL X, 1 ; was across XY
+			IFN EX, 0
+				JMP OMERR ;?OUT OF MEMORY
+			SHL [RAM71], 1
+			IFE EX, 0
+				JMP ROMB378
+			ADD X, [RAM28]
+			IFN EX, 0
+				JMP OMERR
+:ROMB378	SUB [RAM5D], 1
+			IFN [RAM5D], 0
+				JMP ROMB35F
+			RTS
 
 ; fre(0)
+; currently doesn't really work due to garbage collection
 :ROMB37D    IFN [VALTYP], 0
                 JSR ROMB6A6  
-            JSR ROMB526
+            ;JSR GARBAG
             SET A, [RAM33]
-            SUB A, [RAM31]
-            ; fall through to GIVAYF
-            ; TODO: make it unsigned.
+            SUB A, [STREND]
+            JSR GIVAYF
+            IFE [FACSGN], 0
+            	RTS
+            ; make it unsigned by adding 65536
             ; the answer may be >32768.
+            SET A, P65536
+            JMP FADD
+:P65536		DAT 0x91, 0, 0
 
 :GIVAYF ;Convert 16-Bit Signed Integer to Floating Point
 :ROMB391    SET [VALTYP], 0   ; numeric
