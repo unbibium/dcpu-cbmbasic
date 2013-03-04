@@ -474,7 +474,8 @@
 		ADD [FACHO+1], A
 		ADX [FACHO], 0
 		ADD Y, A ; carry bit to the infinite-right
-		ADD [FACOV], Y
+		SET EX, 1
+		ADX [FACOV], Y
 		ADX [FACHO+1], 0
 		ADX [FACHO], 0
 		RTS
@@ -514,24 +515,44 @@
             IFE X, 0x8000
                 IFE [FACHO+1], 0
                     JMP MOVFAHO
+            ; Reciprocal dividers disabled; they're not
+            ; accurate enough for fizzbuzz (though they're
+            ; still used for decimal rendering)
 			; multiply by reciprocal for m=1.25 (5, 10, 20)
-            IFE X, 0xA000
-                JMP DIV125
-			; multiply by reciprocal for m=1.5 (3, 6, 12)
-            IFE X, 0xC000
-                JMP DIV15
-            ; all others, do a 16-bit integer divide.
-            ; this will hold us over until we can do this
-            ; properly.
+            ;IFE X, 0xA000
+            ;    JMP DIV125
+			;; multiply by reciprocal for m=1.5 (3, 6, 12)
+            ;IFE X, 0xC000
+            ;    JMP DIV15
+            ; all others, do a 16-bit integer divide.  This
+            ; will hold us over until we can do this properly.  
+            ; we can squeak out a few more bits of accuracy
+            ; on a small divisor by denormalizing it.
 :FDIVFULL
 			SET [FACOV], 0
+			ADD [FACEXP], 15
+			IFB X, 0x00FF ; Top 8 bits clear
+			    JMP FDIVDEN1
+			SHR X, 8
+			SUB [FACEXP], 8
+:FDIVDEN1
+			IFB X, 1 ; Top bit clear
+				JMP FDIVGO
+:FDIVDEN2   SHR X, 1
+			SUB [FACEXP], 1
+			IFC X, 1
+			    JMP FDIVDEN2
+:FDIVGO
             DIV Y, X    ; ARGHO = ARGHO / FACHO
+            SET [FACHO+1], EX
+            SET [FACHO], Y
+            JMP ROMB8D7
             SET X, EX   ; X = right of decimal point
             IFE Y, 0    ; Y = left of decimal point
                JMP FDIVR0
 :FDIVR1
             ; result is 1.x - shift and store 17 bits
-            SET [COLOR], 0x3600
+            ;SET [COLOR], 0x3600
             SHR X, 1
             SET [FACHO+1], EX
             BOR X, 0x8000
@@ -542,7 +563,7 @@
 :FDIVR0A
             SHL X, 1        ; * 2
 :FDIVR0
-            SET [COLOR], 0x7600
+            ;SET [COLOR], 0x7600
             SUB [FACEXP], 1 ; / 2
             IFC X, 0x8000
                 JMP FDIVR0A
