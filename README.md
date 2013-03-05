@@ -100,6 +100,6 @@ from the KERNAL.
 
 Another promising interpreter for the DCPU-16 is dcpu-admiral,
 which aims to be more Python-like:
-* <https://github.com/r4d2/dcpu-admiral>
+* <https://github.com/orlof/dcpu-admiral>
 
 
