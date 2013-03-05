@@ -1156,12 +1156,12 @@
             SET A, 0x2D ; minus
 :ROMBEE3    SET [Y+2], A
             SET [Y+1], 0x45 ; E
-            SET A, X
-            SET X, 0x2F 
 :ROMBEEE    ; SEC
 :ROMBEEF    SET A, X
             DIV A, 10
+            ADD A, 0x30
             MOD X, 10
+            ADD X, 0x30
             SET [Y+4], X
             SET [Y+3], A
             SET [Y+5], 0
