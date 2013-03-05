@@ -848,7 +848,6 @@
             SET [RAM028F], ROMEB48
             SET [BLNCT], 12
             SET [BLNSW], 12
-            ;SET [CRSW], 12
             SET [XMAS], 10
             SET [RAM028A], 10
             SET [COLOR], 0xE600 ; lt blue on blue
@@ -916,27 +915,27 @@
 :ROME5CD    SET A, [NDX]
             SET [BLNSW], A  ; only blink if buffer is empty
             SET [AUTODN], A ; Don't scroll until buffer is empty
-            IAQ 0 ; this wasn't necessary in the c64 rom
+            IAQ 0 ; the c64 didn't have to manually enable ints here
             IFE A, 0
                 JMP ROME5CD ; Loop until something changes?
 :ROME5D6    IAQ 1 ; SEI
             IFE [BLNON], 0
                 JMP ROME5E7
             ; restore haracter under cursor
-            SET A, [GDBLN]
             SET [BLNON], 0
+            SET [BLNCT], 2
             SET A, [PNT]
             ADD A, [PNTR]
-            SET [A], [GDBLN]  ; was a call to EA13
+            SET [A], [GDBLN]
 :ROME5E7    JSR ROME5B4 ; get character from buffer
-            IFN A, CBM_RUN ; RUN key
-                JMP ROME5FE
+            ;IFN A, CBM_RUN ; RUN key
+            ;    JMP ROME5FE
             ; copy LOAD and RUN into buffer
             ;SET X, 9
             ;IAQ 1
             ;SET [NDX], X
 :ROME5F3    ;DAT 0x5000
-        ;JMP ROME5CD
+            ;JMP ROME5CD
 :ROME5FE    IFN A, CBM_RETURN 
                 JMP ROME5CA
             SET Y, [LNMX]
