@@ -1057,6 +1057,7 @@
             SUB [DECEXP], 1
             IFN [DECEXP], 0
                 JMP ROMBE16
+            ; Normalize downward.
 :ROMBE28    JSR DIV10
 :ROMBE2A    ADD [DECEXP], 1
             IFN [DECEXP], 1
@@ -1069,14 +1070,13 @@
             SET A, [DECEXP]
             ADD A, 10
             IFB A, 0x8000 
-                JMP ROMBE47
+                JMP ROMBE48
             IFG A, 10  ; More than 10 digits?
                 JMP ROMBE48
 :ROMBE42    ADD A, -1   
             SET X, A
             SET A, 2
-:ROMBE47    ADD A, 1   ; simulate SEC
-:ROMBE48    SUB A, 3   ; simulate SBC with possible CLC
+:ROMBE48    SUB A, 2 
             SET [RAM5E], A
             ;Store the positive number of digits
             ; to the left of the decimal point.
@@ -1089,9 +1089,9 @@
 :ROMBE53    SET Y, [RAM71]   ; cached FLOATSTR index
             ADD Y, 1
             SET [Y], 0x2E ; decimal point
-            SET A, X
-            JMP ROMBE64
-:ROMBE5E    ADD Y, 1
+            IFE X, 0 ; 
+                JMP ROMBE64
+:ROMBE5E    ADD Y, 1    ; add 0 after decimal point
             SET [Y], 0x30
 :ROMBE64    SET [RAM71], Y
 :ROMBE66    SET B, FOUTBL
