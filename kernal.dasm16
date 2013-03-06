@@ -673,7 +673,8 @@
             IFN A, 0
                 JMP ROME73F
 :ROME73D    AND A, 0x3F
-:ROME73F    JSR ROME684 ; handle quote flag
+:ROME73F    IFE A, CBM_QUOTE
+                XOR [QTSW], 1
             JMP ROME693  ; print character
 :ROME745    SET X, [INSRT]
             IFN X, 0
@@ -993,7 +994,8 @@
                 JMP ROME654    ; leave undisturbed
 :ROME652    BOR A, 0x40  ; 
 :ROME654    ADD [PNTR], 1
-            JSR ROME684 ; handle quote flag
+            IFE A, CBM_QUOTE
+                XOR [QTSW], 1
 :ROME659    IFN Y, [INDX]
                 JMP ROME674
 :ROME65D    SET [CRSW], 0 ; 
@@ -1013,27 +1015,30 @@
                 SET C, 0
             RTS
 
-; check for quote mark and set flag
-; (6502 version took 13 bytes;
-; this one takes 5 bytes)
-:ROME684    IFE A, CBM_QUOTE
-                XOR [QTSW], 1
-            RTS
-            
-            
+
 ; fill screen at current position
-:ROME691    BOR A, 0x40 
-:ROME693    IFN [RVS], 0
-:ROME697        BOR A, 0x80  ; this means "blink" on LEM.
+:ROME691    BOR A, 0x40
+:ROME693    
+            SET X, [COLOR]
+            IFE [RVS], 0
+               JMP ROME699
+:ROME697    SET X, [COLOR]
+            SHL X, 4
+	    SET B, EX
+            SHL X, 4
+            SET X, EX
+            SHL X, 4
+            BOR X, B
+            SHL X, 8 
+            BOR A, 0x80  ; this means "blink" on LEM.
 :ROME699    IFN [INSRT], 0
                 SUB [INSRT], 1
-            SET X, [COLOR]
             ; TODO: proper RVS handling
             JSR ROMEA13 ; place character on screen
             JSR ROME6B6 ; advance cursor
-            
+
 ; return from output to the screen
-:ROME6A8    
+:ROME6A8
             SET J, POP
             SET I, POP
             SET Y, POP
@@ -1044,6 +1049,8 @@
             SET EX, 0
             IAQ 0  ; RE-ENABLE INTERRUPTS
             RTS
+
+
 
 ;advance the cursor, Get/insert new line
 :ROME6B6    JSR ROME8B3 ; move cursor to next line if 
@@ -1165,7 +1172,7 @@
 :ROME4AC    DAT 0x81
 
 
-; hardware
+; DCPU hardware
 
 :KEYBOARD dat 0
 :MONITOR dat 0
