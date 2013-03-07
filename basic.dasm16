@@ -138,6 +138,29 @@
 
 .DEFINE TXTPTR RAM7A
 
+:RAM01FB  DAT 0
+:RAM01FC  DAT 0
+:RAM01FD  DAT 0
+:RAM01FE  DAT 0
+:RAM01FF  DAT 0
+:RAM0200  ; String buffer?
+    .FILL BASIC_BUFFER_LENGTH 0
+; BASIC Indirect Vector Table
+; if you guys want to port the DOS wedge go ahead
+:RAM0300
+:IERROR     DAT DEF_ERROR
+:RAM0302
+:IMAIN      DAT DEF_MAIN
+:RAM0304
+:ICRNCH     DAT DEF_CRUNCH    ; crunch tokens
+:RAM0306
+:IQPLOP     DAT DEF_QPLOP    ; print tokens
+:RAM0308
+:IGONE      DAT GONE        ; execute statement?
+:RAM030A
+:IEVAL      DAT DEF_EVAL
+:RAM030C    DAT 0
+
 :USRPOK
 :RAM0310    JMP 1234
 .DEFINE RAM0311 USRPOK+1
@@ -797,7 +820,7 @@
 :DEF_CRUNCH
 :ROMA57C    SET X, [RAM7A] 
             SET Y, 2    ; first two characters are taken up by link &c
-            SET [RAM0F], Y
+            SET B, Y
 :ROMA582    SET A, [X]
             IFC A, 0x80  ; BPL, unshifted character.
                 JMP ROMA58E
@@ -810,7 +833,7 @@
             SET [ENDCHR], A
             IFE A, CBM_QUOTE
                 JMP ROMA5EE ; skip to next quote
-            IFB [RAM0F], 0x40 ; BVS
+            IFB B, 0x40 ; BVS
                 JMP ROMA5C9 ; Quote mode for DATA statement
             IFN A, 0x3F ; question mark
                 JMP ROMA5A4
@@ -853,7 +876,7 @@
                 JMP ROMA5DC
             IFN A, (BASIC_DATA_TOKEN-CBM_COLON) ; DATA token
                 JMP ROMA5DE
-:ROMA5DC    SET [RAM0F], A ; Set quote mode ON for DATA
+:ROMA5DC    SET B, A ; Set quote mode ON for DATA
 :ROMA5DE    SUB A, (BASIC_REM_TOKEN-CBM_COLON) 
             AND A, 0xFF
             IFN A, 0
@@ -989,7 +1012,7 @@
                 JMP ROMA6C9
             SET [LINNUM], -1
 ; LIST LINES from RAM5F to LINNUM
-:ROMA6C9    SET [RAM0F], 1
+:ROMA6C9    SET B, 1
             SET Y, [RAM5F]
 :ROMA6CD    IFE [Y], 0     ; no link to next line
                 JMP ROMA714
@@ -1007,7 +1030,7 @@
             ; loop to print a line
 :ROMA6F3    JSR ROMAB47 ; print character
             IFE A, CBM_QUOTE
-            XOR [RAM0F], -1 ; enter quote mode
+            XOR B, -1 ; enter quote mode
             ADD Y, 1
             ;IFE Y, 0  ; what, stop after 256 characters?
             ;   JMP ROMA714
@@ -1028,7 +1051,7 @@
                 JMP ROMA6F3   ; print literal
             IFE A, 0xFF ; PI
                 JMP ROMA6F3   ; print literal
-            IFB [RAM0F], 0x8000 ; BMI
+            IFB B, 0x8000 ; BMI
                 JMP ROMA6F3   ; print literal
             ; token value detected
 :ROMA724    SUB A, 0x7F

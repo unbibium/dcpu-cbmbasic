@@ -11,12 +11,27 @@
 .DEFINE DCPU_CTRL 0x91
 .DEFINE DCPU_STOP 0x1B
 
+:KEYTAB 
+:RAMF5 DAT 0
 :RAM91 ; stop key flag
 :STKEY  DAT 0
 :RAMC5  ; Code of last key pressed
 :LSTX   DAT 0
 :RAMC6  ; Number of Characters in Keyboard Queue
 :NDX    DAT 0
+:RAM028A
+:RPTFLAG    DAT 0
+:RAM028B
+:KOUNT      DAT REPEAT_FRAMES_B
+:RAM028C
+:DELAY      DAT REPEAT_FRAMES_A
+:RAM028D
+:SHFLAG     DAT 0
+:RAM028E
+:LSTSHF     DAT 0
+:RAM028F
+:KEYLOG     DAT 0 ; ROM?
+
 
 ; Handle keyboard interrupts by storing keystrokes in
 ; special RAM locations, where they'll be picked up by 
@@ -27,6 +42,10 @@
 ; 0x05: control
 ; this doesn't work on any known implementation yet
 :KEYSHIFT .DAT 0
+
+:RAM0277    ;KEYBOARD BUFFER
+:KEYD
+    .FILL KEYBOARD_BUFFER_SIZE 32
 
 ;-----------------------------------------------------------
 ; KEYBOARD INTERRUPT ROUTINE - triggered by keyboard events
@@ -218,6 +237,21 @@
             ADD [NDX], 1
 :ROMEB47
             RTS
+
+
+; check for STOP key (probably ESC)
+; return C=1 if STOP key pressed.
+:DEF_STOP
+:ROMF6ED    SET Z, 0
+			SET C, 0
+            IFN [RAM91], 0x7F
+                RTS
+            JSR ROMFFCC
+            SET [RAMC6], A
+            SET C, 1
+            SET Z, 1
+            RTS
+
 
 :DISPLAY_INPUT_BUFFER
     SET PUSH, X
