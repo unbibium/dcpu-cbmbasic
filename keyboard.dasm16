@@ -181,8 +181,9 @@
 :ROMEAF0 
     ; clear shift bit so that we can test for
     ; a character and its shifted equivalent
-    ; at the same tims.
-        AND A, 0x407F
+    ; at the same time.
+    SET EX, A ; cache instead of using the stack
+    AND A, 0x407F
 :ROMEAF2
     ; handle key repeat logic
     IFB [RAM028A], 0x80
@@ -194,15 +195,14 @@
     ; repeat only these characters
     IFE A, CBM_DELETE  ;and insert
         JMP ROMEB0D
-    ; no need to software-repeat the space
-    ; the dcpu does it for us?
-    ;IFE A, 0x20 ; SPACE
-    ;    JMP ROMEB0D
+    IFE A, 0x20 ; SPACE
+        JMP ROMEB0D
     IFE A, CBM_RIGHT ; cursor right/left
         JMP ROMEB0D
     IFN A, CBM_DOWN ; cursor up/down
         RTS
 :ROMEB0D ; repeat this key
+    SET A, EX
     IFE [RAM028C], 0
         JMP ROMEB17
     SUB [RAM028C], 1
@@ -232,7 +232,7 @@
             SET X, [NDX]
             IFG X, KEYBOARD_BUFFER_SIZE  ; keyboard buffer overflow
                 RTS
-:ROMEB3C    ; Add A to keybuard queue
+            ; Add A to keybuard queue
             SET [KEYD+X], A
             ADD [NDX], 1
 :ROMEB47
