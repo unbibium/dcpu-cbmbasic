@@ -330,11 +330,9 @@
 :WORDS      DAT " BASIC BYTES FREE"
             DAT CBM_RETURN, 0
 :ROME473    DAT CBM_CLR ;to clear the screen
-            DAT 0x05, " ** "
-            DAT 0x99, "DCPU-16 BASIC V2", 0x05," **"
+            DAT 0x99, "DCPU BASIC ALPHA 0307"
             DAT 0x9A
             DAT CBM_RETURN
-            ;DAT " 64K RAM SYSTEM  "
             DAT 0
 :ROME4AC    DAT 0x81
 
