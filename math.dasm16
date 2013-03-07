@@ -139,8 +139,8 @@
             SET [FACHO], A
             ; BCS B8D7, then JSR NEGFAC
 :ROMB8D2    ;IFN [ARYTAB], [VARTAB]
-			;	JMP FACCRASH
-			IFE EX, -1 ; one borrow left to do
+            ;	JMP FACCRASH
+            IFE EX, -1 ; one borrow left to do
                 JSR NEGFAC
 :ROMB8D7    SET Y, 0
 :ROMB8D9    SET A, Y
@@ -441,9 +441,8 @@
         SET [ARISGN], 0
 ; reciprocal multiplier for 1/1.25 (3, 6, 12, etc)
 :DIV125
-		SET X, 0xCCCC
+        SET X, 0xCCCC
         JMP MULRPT
-	;JMP FACCRASH
 
 ; reciprocal multiplier for 1/1.5 (3, 6, 12, etc)
 :DIV15
@@ -462,9 +461,12 @@
 		ADD Y, A ; carry bit to the infinite-right
 		SET [FACHO+1], Y
 		SET [FACOV], Y
-		IFE [ARGHO], 0
-			RTS
 		SET A, [ARGHO+1]
+		IFN A, 0
+		   JMP MULRPT2 ; Multiply next word of ARG
+                SET Y, A
+                JMP MULRPT3 ; Add rounding bit and return.
+:MULRPT2        ; Multiply ARGHO+1 by same thing
 		MUL A, X
 		SET Y, EX
 		ADD [FACHO+1], Y
@@ -474,11 +476,14 @@
 		ADD [FACHO+1], A
 		ADX [FACHO], 0
 		ADD Y, A ; carry bit to the infinite-right
+:MULRPT3        ; Add rounding bit
 		SET EX, 1
 		ADX [FACOV], Y
 		ADX [FACHO+1], 0
 		ADX [FACHO], 0
-		RTS
+		IFN DEBUG_DIV, 0
+            JMP FACCRASH
+		JMP ROMB8D7 ; normalize
 
 :ROMBB07	SET [ARISGN], 0
 			JSR MOVFM
@@ -519,11 +524,11 @@
             ; accurate enough for fizzbuzz (though they're
             ; still used for decimal rendering)
 			; multiply by reciprocal for m=1.25 (5, 10, 20)
-            ;IFE X, 0xA000
-            ;    JMP DIV125
+            IFE X, 0xA000
+                JMP DIV125
 			;; multiply by reciprocal for m=1.5 (3, 6, 12)
-            ;IFE X, 0xC000
-            ;    JMP DIV15
+            IFE X, 0xC000
+                JMP DIV15
             ; all others, do a 16-bit integer divide.  This
             ; will hold us over until we can do this properly.  
             ; we can squeak out a few more bits of accuracy
@@ -547,29 +552,8 @@
             SET [FACHO+1], EX
             SET [FACHO], Y
             JMP ROMB8D7
+
             SET X, EX   ; X = right of decimal point
-            IFE Y, 0    ; Y = left of decimal point
-               JMP FDIVR0
-:FDIVR1
-            ; result is 1.x - shift and store 17 bits
-            ;SET [COLOR], 0x3600
-            SHR X, 1
-            SET [FACHO+1], EX
-            BOR X, 0x8000
-            SET [FACHO], X
-            RTS
-            ; result is 0.x - normalize before storing
-            ; but increase exponent to compensate.
-:FDIVR0A
-            SHL X, 1        ; * 2
-:FDIVR0
-            ;SET [COLOR], 0x7600
-            SUB [FACEXP], 1 ; / 2
-            IFC X, 0x8000
-                JMP FDIVR0A
-            SET [FACHO], X
-            SET [FACHO+1], 0
-            RTS
 
             ; here's the original division routine, it started
             ; where the special case section is now.
@@ -1449,5 +1433,6 @@
             SET J, [FACHO+1]
             SET EX, [FACEXP]
             SET Z, [FACSGN]
+            SET Z, [FACOV]
             BOR 0xBCBC, 0xBCBC
             JMP CRASH
