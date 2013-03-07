@@ -856,8 +856,8 @@
             SET [FACHO+1], 0
             SET [FACSGN], 0
             ; parse result from last CHRGET
-            IFE C, 0
-                JMP ROMBD6A ; is a digit
+            IF_IS_DIGIT
+                JMP ROMBD6A 
             IFN A, 0x2D ; minus
                 JMP ROMBD06
             SET X, -1
@@ -867,7 +867,7 @@
             ; get digit after +/-
 :ROMBD0A    JSR CHRGET
             ; parse a digit
-:ROMBD0D    IFE C, 0    ; is a digit
+:ROMBD0D    IF_IS_DIGIT
                 JMP ROMBD6A
 :ROMBD0F    IFE A, 0x2E ; decimal point
                 JMP ROMBD41
@@ -875,7 +875,7 @@
                 JMP ROMBD47
             ; handle exponent notation
             JSR CHRGET
-            IFE C, 0  ; is a digit
+            IF_IS_DIGIT
                 JMP ROMBD91
             IFE A, BASIC_MINUS_TOKEN
                 JMP ROMBD2E
@@ -889,7 +889,7 @@
             ; handle negative exponent
 :ROMBD2E    SET [RAM60], -1
 :ROMBD30    JSR CHRGET
-            IFE C, 0 ; is a digit?
+            IF_IS_DIGIT
                 JMP ROMBD91
 :ROMBD35    IFN [RAM60], -1 ; bpl
                 JMP ROMBD47
@@ -1204,7 +1204,7 @@
 				JMP ROMBF9E
 			SET A, RAM4E
 			JSR ROMBC5B
-			IFE Z, 0
+			IFN A, 0 ; not equal
 				JMP ROMBF9E
 			SET A, Y
 			SET Y, [RAM07]
@@ -1221,12 +1221,11 @@
 				RTS
 			
 
-; MINUS operator
+; unary MINUS operator
 ; Perform NOT and >
 :NEGOP
-:ROMBFB4    IFE [FACEXP], 0
-                RTS
-            XOR [FACSGN], -1
+:ROMBFB4    IFN [FACEXP], 0
+                XOR [FACSGN], -1
             RTS
 
 ; float constants for EXP
@@ -1350,11 +1349,11 @@
 :ROME0F6	JMP ROMBBD4 ; round FAC1 and move to X
 
 ; COS function
-:ROME264	SET A, ROME2E0 
-			JSR FADD
+:ROME264	SET A, ROME2E0  ; 0.5*PI
+			JSR FADD ; cos(x) = sin(x+pi/2)
 ; SIN function
 :ROME26B	JSR MOVAF
-			SET A, ROME2E5
+			SET A, ROME2E5  ; 2*PI
 			SET X, [ARGSGN]
 			JSR ROMBB07  ; divide by 2*PI
 			JSR MOVAF
@@ -1373,13 +1372,13 @@
 				JMP ROME2A0
 			XOR [RAM12], -1 ; ???
 :ROME29D	JSR NEGOP
-:ROME2A0	SET A, ROME2EA
+:ROME2A0	SET A, ROME2EA   ; 0.25
 			JSR FADD
 			SET A, POP
 			IFA A, -1
 				JMP ROME2AD
 			JSR NEGOP
-:ROME2AD	SET A, ROME2EF
+:ROME2AD	SET A, ROME2EF ; polynomial table
 			JMP ROME043
 
 ; TAN function

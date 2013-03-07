@@ -1,3 +1,7 @@
+;  BASIC Interpreter
+;
+; TODO: catalogue external hooks.
+;
 :RAM03  
 :ADRAY1 DAT BLANK
 :RAM05  
@@ -118,7 +122,8 @@
 :CHRGET
 :RAM0073    ADD [RAM7A], 1
 :CHRGOT
-:RAM0079    DAT 0x7801 ;SET A, [next word]
+:RAM0079    
+:TXTPTR     DAT 0x7801 ;SET A, [next word]
 :RAM7A      DAT 0x0800 
             AND A, 0xFF  ; BASIC statements are still 8-bit
             SET C, 1
@@ -136,9 +141,13 @@
 :RAM008Z        SET Z, 1
             RTS
 
-.DEFINE TXTPTR RAM7A
+; Macros to handle return result.
+; Optimizing CHRGET may require me to change these.
+.DEFINE IF_IS_DIGIT      IFE C, 0
+.DEFINE IF_NOT_DIGIT     IFE C, 1
+.DEFINE IF_LAST_CHAR     IFE Z, 1
+.DEFINE IF_NOT_LAST_CHAR IFE Z, 0
 
-:RAM01FB  DAT 0
 :RAM01FC  DAT 0
 :RAM01FD  DAT 0
 :RAM01FE  DAT 0
@@ -189,6 +198,7 @@
 .DEFINE BASIC_SGN_TOKEN 0xB4
 .DEFINE BASIC_MINUS_TOKEN 0xAB
 .DEFINE BASIC_PLUS_TOKEN 0xAA
+.DEFINE BASIC_GO_TOKEN 0xCB
 
 
 
@@ -705,7 +715,7 @@
 :ROMA48E    IFE A, 0  ; BEQ $A480 
                 JMP [IMAIN]   ; which was this JMP
             SET [CURLIN], -1 ; enter immediate mode
-            IFE C, 0 ; begins with a digit
+            IF_IS_DIGIT 
                JMP MAIN1 ; add line to program
             ; parse statement in immediate mode
             JSR CRUNCH ; token cruncher
@@ -944,7 +954,7 @@
 ; NEW command
 
 :STMT_NEW
-:ROMA642    IFE Z, 0
+:ROMA642    IF_NOT_LAST_CHAR
                 RTS
 :ROMA644    SET I, [TXTTAB]
             STI [I], 0
@@ -958,7 +968,7 @@
 ; CLR command
 
 :STMT_CLR
-:ROMA65E    IFE Z, 0
+:ROMA65E    IF_NOT_LAST_CHAR
                 RTS   ; BNE $A68D            
 :ROMA660    JSR CLALL
 :ROMA663    SET [FREETOP], [MEMSIZ]
@@ -988,16 +998,16 @@
             RTS
 
 :STMT_LIST
-:ROMA69C    IFE C, 0     ; LIST line
+:ROMA69C    IF_IS_DIGIT     ; LIST line
                 JMP ROMA6A4
-            IFE Z, 1    ; LIST all
+            IF_LAST_CHAR    ; LIST all
                 JMP ROMA6A4
             IFN A, BASIC_MINUS_TOKEN ; LIST -end
                 RTS
 :ROMA6A4    JSR LINGET
             JSR FINDLN ; 
             JSR CHRGOT
-            IFE Z, 1  ; no end line specified
+            IF_LAST_CHAR  ; no end line specified
                 JMP ROMA6BB
             IFN A, BASIC_MINUS_TOKEN  ; range to end
                 RTS
@@ -1088,7 +1098,7 @@
             IFE Z, 0 ;
                 JMP ROMA753
             ; we're already looping on this variable
-            ADD X, 10  ; is this right?
+            ADD X, 10  
             SET SP, X  ; purge that loop from the stack 
 :ROMA753    SET A, POP ; discard JSR
             SET A, 11   ; test for this many bytes available
@@ -1120,10 +1130,6 @@
             JSR ROMAE38  ; push STEP with separate sign byte +4
             SET PUSH, [FORPNT] ; pointer to increment variable +1
             SET PUSH, BASIC_FOR_TOKEN
-            ;SET A, PEEK
-            ;SET B, PICK 1
-            ;SET C, PICK 2
-            ;DAT 0x0C00
 
 ; execute next statement
 
@@ -1162,7 +1168,7 @@
 
 ; execute command  at RAM7A.
 ; its first character or token is in A
-:ROMA7ED    IFN Z, 0  ; If zero bit set
+:ROMA7ED    IF_LAST_CHAR
                 RTS
 :ROMA7EF    SUB A, 0x80
             IFU A, 0   
@@ -1176,7 +1182,7 @@
                 JMP ROMA7E1
             JMP SNERR
             ; handle "GO TO" with a space in it
-:ROMA80E    IFN A, 0x4B ; GO code
+:ROMA80E    IFN A, BASIC_GO_TOKEN-0x80
                 JMP SNERR
             JSR CHRGET
             SET A, BASIC_TO_TOKEN   ; TO code
@@ -1204,7 +1210,7 @@
 ; END command
 :STMT_END
             SET C, 0      ; CLC
-:ROMA832    IFE Z, 0     ; Not end of statement
+:ROMA832    IF_NOT_LAST_CHAR     ; Not end of statement
                 RTS
 :ROMA834    SET A, [RAM7A]      
 :ROMA838    IFG [CURLIN], 0xFF00 ; in immediate mode
@@ -1218,7 +1224,7 @@
             JMP ROMA469  ; go to READY prompt
 
 :STMT_CONT
-:ROMA857    IFE Z, 1
+:ROMA857    IF_LAST_CHAR
                 RTS
             SET X, 0x1A ; ?CAN'T CONTINUE ERROR
             IFL [OLDTXT], 0x100
@@ -1232,13 +1238,13 @@
 :STMT_RUN
 :ROMA871    SET PUSH, Z
             SET A, 0
-:ROMA874    JSR SETMSG
-:ROMA877    SET Z, POP
-:ROMA878    IFN Z, 0 ; Not zero
+            JSR SETMSG
+            SET Z, POP
+            IF_LAST_CHAR
                 JMP ROMA659 ; clear variable memory
 
 :ROMA87D    JSR ROMA660      ; do CLR
-:ROMA880    JMP ROMA897      ; do GOTO
+:ROMA880    JMP ROMA897      ; get line number and do GOTO
 
 ; GOSUB command
 
@@ -1277,7 +1283,7 @@
 
 ; RETURN command
 :STMT_RETURN
-:ROMA8D2    IFE Z, 0
+:ROMA8D2    IF_NOT_LAST_CHAR
                 RTS
             BOR [RAM49], 0xFF00 ; in case GOSUB from immediate
             JSR FNDFOR   ; Search for FOR blocks on stack
@@ -1347,9 +1353,9 @@
 
 :STMT_THEN
 :ROMA940    JSR CHRGOT
-            IFN C, 0        ; THEN <command>
+            IF_NOT_DIGIT    ; THEN <command>
                 JMP ROMA7ED ; execute command
-            JMP STMT_GOTO ; THEN <line number>
+            JMP STMT_GOTO   ; THEN <line number>
 
 :STMT_ON
 :ROMA94B    JSR ROMB79E  ; Get result of expression after ON
@@ -1372,14 +1378,13 @@
             RTS         
 
 ; get decimal number into $14/$15
-; C should be zero coming in, and
-; A should be the result of a CHRGET.
+; A/C/Z should be the result of a CHRGET.
 ; throws an illegal quantity error if over 63999.
 
 :LINGET
 :ROMA96B    SET X, 0
             SET [LINNUM], 0
-:ROMA971    IFN C, 0
+:ROMA971    IF_NOT_DIGIT
                 RTS
             SUB A, 0x30   ; get value of ASCII digit
             IFG [LINNUM], 6399 ; about to be >64000
@@ -1491,7 +1496,7 @@
             ADD A, Y
             SET A, [A]  ; LDA ($22),Y
             JSR RAM0080 ; verify is digit
-            IFN C, 0 ; not a digit
+            IF_NOT_DIGIT
                 JMP FCERR
             SUB A, 0x30
 :ROMAA29    JMP FINLOG
@@ -1531,9 +1536,9 @@
 :ROMAA9A    JSR ROMAB21
 :ROMAA9D    JSR CHRGOT
 :STMT_PRINT
-:ROMAAA0    IFE Z, 1  ; print by itself, or non-semicolon-terminated
+:ROMAAA0    IF_LAST_CHAR  ; print by itself, or non-semicolon-terminated
                 JMP ROMAAD7 ; print CR
-:ROMAAA2    IFE Z, 1
+:ROMAAA2    IF_LAST_CHAR
                 RTS
 :ROMAAA4    IFE A, BASIC_TAB_TOKEN   ; TAB(
                 JMP ROMAAF8
@@ -1733,7 +1738,7 @@
             JMP ROMA8FB ; ... = I, next statement.
 
 ; get line into input buffer
-:ROMABF9    IFN [RAM13], 0
+:ROMABF9    IFN [CHANNL], 0
                 JMP ROMAC03
             JSR ROMAB45 ; print question mark
             JSR ROMAB3B
@@ -1750,7 +1755,7 @@
             SET [OPPTR], [RAM7A]
             SET [RAM7A], [INPPTR] ; move cursor to reading location
             JSR CHRGOT
-            IFE Z, 0
+            IF_NOT_LAST_CHAR
                 JMP ROMAC51
             IFN [INPFLG], INF_GET ; BVC
                 JMP ROMAC41
@@ -1793,7 +1798,7 @@
             SET A, [INTFLG]
             JSR ROMA9C2 ; assign to float or integer.
 :ROMAC91    JSR CHRGOT
-            IFE Z, 1        ; end of input
+            IF_LAST_CHAR
                 JMP ROMAC9D
             IFE A, CBM_COMMA ; end of variable
                 JMP ROMAC9D
@@ -1801,7 +1806,7 @@
 :ROMAC9D    SET [INPPTR], [RAM7A]
             SET [RAM7A], [OPPTR] ; return cursor to program listing
             JSR CHRGOT
-            IFE Z, 1
+            IF_LAST_CHAR
                 JMP ROMACDF  ; no more variables in statement
             JSR CHKCOM       ; OR, comma
             JMP ROMAC15      ; followed by another variable
@@ -1842,7 +1847,7 @@
 
 ; NEXT statement - see STMT_FOR
 :STMT_NEXT
-:ROMAD1E    IFE Z, 0
+:ROMAD1E    IF_NOT_LAST_CHAR
                 JMP ROMAD24
             SET Y, 0     ; don't know which variable to advance
             JMP ROMAD27
@@ -2093,7 +2098,7 @@
 :DEF_EVAL
 :ROMAE86    SET [VALTYP], 0   ; numeric
 :ROMAE8A    JSR CHRGET
-            IFE C, 0 ; is a digit
+            IF_IS_DIGIT
                 JMP FIN  ; read number into float
 :ROMAE92    JSR ISALPHA
             IFE C, 1 ; is alpha
@@ -2389,7 +2394,7 @@
 :STMT_DIM	SET X, A
 			JSR ROMB090
 			JSR CHRGOT
-			IFE Z, 0
+			IF_NOT_LAST_CHAR
 				JMP ROMB07E
 			RTS
             
@@ -2411,7 +2416,7 @@
 :ROMB09F    SET [VALTYP], 0  ; numeric
             SET [INTFLG], 0
             JSR CHRGET
-            IFE C, 0 ; is a digit
+            IF_IS_DIGIT
                 JMP ROMB0AF
             JSR ISALPHA
             IFE C, 0 ; not alpha
@@ -2420,7 +2425,7 @@
             ; only first two characters count
             ; discard the rest of the variable name
 :ROMB0B0    JSR CHRGET
-            IFE C, 0 ; ...
+            IF_IS_DIGIT
                 JMP ROMB0B0
             JSR ISALPHA
             IFE C, 1 ; is alpha
@@ -3101,7 +3106,7 @@
             SET X, [Y+1]  ; address?
             ; originally loaded XY from 3 bytes
             ; Don't deallocate if...
-            IFE Z, 0  ; the original A wasn't LASTPT.
+            IF_NOT_LAST_CHAR  ; the original A wasn't LASTPT.
                 JMP ROMB6D6
             IFN X, [FREETOP] ; the address isn't top of memory
                 JMP ROMB6D6
