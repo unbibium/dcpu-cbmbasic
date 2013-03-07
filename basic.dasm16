@@ -1638,11 +1638,7 @@
             ; sanity check
             ;IFG A, 0xFF
             ;   JMP CRASH
-            ;SET PUSH, X
-            ;SET PUSH, Y
             JSR ROMAB47 ; print 1 character
-            ;SET Y, POP; shouldn't destroy Y
-            ;SET X, POP
             ADD Y, 1
             IFN A, CBM_RETURN  ; cr?
                 JMP ROMAB28
@@ -1661,10 +1657,6 @@
             IFE A, -1 ; skip next
 :ROMAB45    SET A, 0x3F  ; question mark
 :ROMAB47    JSR ROME10C
-            ; AND #$FF
-            SET Z, 0
-            IFE A, 0
-                SET Z, 1
 :ROMAB4C    RTS
 
 ; Read errors
@@ -1857,16 +1849,16 @@
             ; [FORPNT] contains the variable we're really looping
             IFE Z, 1    ; found the variable
                 JMP ROMAD35
-:ROMAD30    SET X, 0x0A ; ?NEXT WITHOUT FOR
+            SET X, 0x0A ; ?NEXT WITHOUT FOR
             JMP ERROR
 :ROMAD35    SET SP, X  ; synchronize stack with that FOR
             ; this discards any inner loops we've skipped
-:ROMAD42    SET A, SP
+            SET A, SP
             ADD A, 2   ; pointer to STEP value
             JSR MOVFM  ; set FAC1
             SET [FACSGN], PICK 5
 :ROMAD4B    SET A, [FORPNT] ; pointer to loop variable
-:ROMAD4F    JSR FADD        ; add to STEP value
+            JSR FADD        ; add to STEP value
             JSR ROMBBD0     ; set loop variable to result
             SET A, SP
             ADD A, 6   ; pointer to TO value
@@ -2283,9 +2275,6 @@
             ; handle single-argument functions
 :ROMAFD1    JSR PARCHK ; evaluate between parens
             SET Y, POP
-            SET A, Y ; DEBUG
-            SET B, FUNCTION_VECTOR ; DEBUG
-            SET C, FUNCTION_ROUTINES
 :ROMAFD6    ADD Y, FUNCTION_VECTOR
             JSR [Y]
             JMP CHKNUM ; check return is numeric
