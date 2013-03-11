@@ -11,14 +11,23 @@
 .DEFINE DCPU_CTRL 0x91
 .DEFINE DCPU_STOP 0x1B
 
-:KEYTAB 
-:RAMF5 DAT 0
 :RAM91 ; stop key flag
 :STKEY  DAT 0
 :RAMC5  ; Code of last key pressed
 :LSTX   DAT 0
 :RAMC6  ; Number of Characters in Keyboard Queue
 :NDX    DAT 0
+
+; Handle keyboard interrupts by storing keystrokes in
+; special RAM locations, where they'll be picked up by 
+; the clock interrupt.
+:KEYASCII .DAT 0
+
+; 0x01: shift
+; 0x05: control
+; this doesn't work on any known implementation yet
+:KEYSHIFT .DAT 0
+
 :RAM028A
 :RPTFLAG    DAT 0
 :RAM028B
@@ -32,20 +41,6 @@
 :RAM028F
 :KEYLOG     DAT 0 ; ROM?
 
-
-; Handle keyboard interrupts by storing keystrokes in
-; special RAM locations, where they'll be picked up by 
-; the clock interrupt.
-:KEYASCII .DAT 0
-
-; 0x01: shift
-; 0x05: control
-; this doesn't work on any known implementation yet
-:KEYSHIFT .DAT 0
-
-:RAM0277    ;KEYBOARD BUFFER
-:KEYD
-    .FILL KEYBOARD_BUFFER_SIZE 32
 
 ;-----------------------------------------------------------
 ; KEYBOARD INTERRUPT ROUTINE - triggered by keyboard events
@@ -181,9 +176,8 @@
 :ROMEAF0 
     ; clear shift bit so that we can test for
     ; a character and its shifted equivalent
-    ; at the same time.
-    SET EX, A ; cache instead of using the stack
-    AND A, 0x407F
+    ; at the same tims.
+        AND A, 0x407F
 :ROMEAF2
     ; handle key repeat logic
     IFB [RAM028A], 0x80
@@ -195,14 +189,15 @@
     ; repeat only these characters
     IFE A, CBM_DELETE  ;and insert
         JMP ROMEB0D
-    IFE A, 0x20 ; SPACE
-        JMP ROMEB0D
+    ; no need to software-repeat the space
+    ; the dcpu does it for us?
+    ;IFE A, 0x20 ; SPACE
+    ;    JMP ROMEB0D
     IFE A, CBM_RIGHT ; cursor right/left
         JMP ROMEB0D
     IFN A, CBM_DOWN ; cursor up/down
         RTS
 :ROMEB0D ; repeat this key
-    SET A, EX
     IFE [RAM028C], 0
         JMP ROMEB17
     SUB [RAM028C], 1
@@ -232,26 +227,11 @@
             SET X, [NDX]
             IFG X, KEYBOARD_BUFFER_SIZE  ; keyboard buffer overflow
                 RTS
-            ; Add A to keybuard queue
+:ROMEB3C    ; Add A to keybuard queue
             SET [KEYD+X], A
             ADD [NDX], 1
 :ROMEB47
             RTS
-
-
-; check for STOP key (probably ESC)
-; return C=1 if STOP key pressed.
-:DEF_STOP
-:ROMF6ED    SET Z, 0
-			SET C, 0
-            IFN [RAM91], 0x7F
-                RTS
-            JSR ROMFFCC
-            SET [RAMC6], A
-            SET C, 1
-            SET Z, 1
-            RTS
-
 
 :DISPLAY_INPUT_BUFFER
     SET PUSH, X

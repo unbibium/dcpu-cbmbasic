@@ -30,29 +30,19 @@
 .DEFINE REPEAT_FRAMES_A 16 
 .DEFINE REPEAT_FRAMES_B 4 
 
-.DEFINE KEYBOARD_BUFFER_SIZE 255
+.DEFINE KEYBOARD_BUFFER_SIZE 80
 
 ; set this to 1 to enable more specific messages
 ; before ?SYNTAX  ERROR.
 .DEFINE DEBUG_SNERR 0
-
-.DEFINE DEBUG_DIV 0
 
 ; you can define an automatic test program here
 ; as long as it's smaller than the keyboard buffer above
 ; terminate in 0.  Lowercase characters will be printed
 ; as shifted characters, so you can abbreviate commands.
 :BASIC_TEST_STRING
-; DAT "?35/5",13,0
-	DAT 0,"10 FOR X=1TO100 :"
-	DAT "A$=",34,34,13
-	DAT "20 IFX/3=INT(X/3)THEN A$=A$+",34,0x9F,"FIZZ",0x9A,34,13
-	DAT "30 IFX/5=INT(X/5)THEN A$=A$+",34,0x99,"BUZZ",0x9A,34,13
-	DAT "40 IFA$<>",34,34," THEN ?X;A$",13
-	DAT "50 NEXT X",13
-	DAT "RUN",13
     DAT 0
-	
+
 :RUN_TEST_STRING
     SET I, BASIC_TEST_STRING
     SET J, KEYD

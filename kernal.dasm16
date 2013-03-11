@@ -34,7 +34,6 @@
 .INCLUDE "keyboard.dasm16"
 .INCLUDE "screen.dasm16"
 
-
 :RAM90
 :STATUS DAT 0
 :RAM9D
@@ -49,15 +48,13 @@
 :DFLTN  DAT 0
 :RAM9A  
 :DFLTO  DAT 3
-:RAMCA  DAT 0
-:RAMCB ; Code of Current Key Pressed
-:SFDX   DAT 0
-:RAMD0 ; Input from Keyboard (0) or Screen (3)
-:CRSW   DAT 0
+
 :RAMAC  
 :SAL    DAT 0
 :RAMAE  
 :EAL    DAT 0
+; scroll pointer
+:SCPNT  DAT 0
 :RAMB2  DAT 0
 :RAMC1  DAT 0
 ; Filename and length
@@ -66,6 +63,12 @@
 :RAMBB
 :FNADR  DAT 0
 
+; keyboard memory
+;
+; Keyboard Decode Table
+:KEYTAB 
+:RAMF5 DAT 0
+
 ; another floating point conversion thingy
 :BASZPT 
 :RAMFF DAT 0
@@ -73,12 +76,26 @@
 ;------
 
 ; This block of 256 bytes had the same function as the 6502 stack.
+; Notable differences include:
+;    originally, GOSUB pushed 5 bytes on the stack; now it pushes 3.
 :STACK         
               .FILL 256 32
 :STACKBASEND
                 .FILL 6 32
 :STACKEND
 
+
+:RAM0277    ;KEYBOARD BUFFER
+:KEYD
+    .FILL KEYBOARD_BUFFER_SIZE 32
+
+:RAM01FB  DAT 0
+:RAM01FC  DAT 0
+:RAM01FD  DAT 0
+:RAM01FE  DAT 0
+:RAM01FF  DAT 0
+:RAM0200  ; String buffer?
+    .FILL BASIC_BUFFER_LENGTH 0
 :RAM0281 
 :MEMSTR   ; Start of memory, only used once
         DAT BASICMEM
@@ -86,6 +103,7 @@
         DAT BASICMEMEND
 :RAM0285 ; ???
         DAT 0
+
 :RAM0289
 :XMAS   DAT 10
 :RAM0291
@@ -95,6 +113,21 @@
 ; Temporary index to the next line for screen scrolling
 :RAM02A5    DAT 0
 
+; BASIC Indirect Vector Table
+; if you guys want to port the DOS wedge go ahead
+:RAM0300
+:IERROR     DAT DEF_ERROR
+:RAM0302
+:IMAIN      DAT DEF_MAIN
+:RAM0304
+:ICRNCH     DAT DEF_CRUNCH    ; crunch tokens
+:RAM0306
+:IQPLOP     DAT DEF_QPLOP    ; print tokens
+:RAM0308
+:IGONE      DAT GONE        ; execute statement?
+:RAM030A
+:IEVAL      DAT DEF_EVAL
+:RAM030C    DAT 0
 ; IRQ
 :RAM0314    DAT ROMEA31
 :RAM0316    DAT 0
@@ -121,6 +154,9 @@
 :ICLALL  
 :RAM032C    DAT DEF_CLALL
 :RAM033C    DAT 0
+
+; TODO: use preprocessor to hide all the debugging code
+; when HW_ROWS >= 12.
 
 ; Error handler for IO calls
 :ROME0F9    IFN A, 0xF0
@@ -262,10 +298,290 @@
            JMP DBGLOOP2
         SET B, POP
 
+:ROMEAE0 
+;Decode the Keystroke and Place its ASCII Value in the Keyboard Buffer
+
+
+:ROMEB48    ;Set up proper keyboard decode table
+            RTS
+; load/run for RUN key
+
+:ROMEC44    IFN A, 0x0E ; Lowercase code
+                JMP ROMEC4F
+            ; TODO: FINISH
+:ROMEC4F    IFN A, 0x8E ; Uppercase code
+                JMP ROMEC5E
+            ; TODO: FINISH
+            
+; SHIFT-C= KEY CHECK
+:ROMEC5E
+    ; TODO: FINISH
+            JMP ROME6A8
+       
+            
+; KERNAL STUBS
 :ROME37B    RTS
 
 :DEF_IOBASE
 :ROME500    RTS
+; initialize screen and keyboard
+:ROME518    
+            ;JSR ROME5A0 ; initialize VIC chip - skip
+            SET [MODE], 0
+            SET [BLNON], 0   
+            SET [RAM028F], ROMEB48
+            SET [BLNCT], 12
+            SET [BLNSW], 12
+            SET [XMAS], 10
+            SET [RAM028A], 10
+            SET [COLOR], 0xE600 ; lt blue on blue
+            SET [RAM028C], REPEAT_FRAMES_A   ; key repeat speed
+            SET [RAM028B], REPEAT_FRAMES_B   ; key repeat speed
+:ROME544    ; Initialize screen link table
+            ; and clear the screen.  The 16-bit
+            ; version doesn't need to attach
+            ; the high byte of memory to this.
+            SET I, LDTB1
+            SET J, 0
+:LINCLRLOOP STI I, DL_UNLINKED ; DISCONNECTED
+            IFN J, HW_ROWS+1
+                JMP LINCLRLOOP
+            SET I, -1 
+            SET X, HW_ROWS-1 ; ?
+:ROME560    JSR ROME9FF  ; clear one screen line
+            SUB X, 1
+            IFA X, -1 ; BPL
+                JMP ROME560
+:ROME566
+            SET [PNTR], 0 ; column 0
+            SET [TBLX], 0 ; row 0
+; set address of current screen line
+:ROME56C
+            SET X, [TBLX]
+:ROME570    SET Y, [X+LDTB1]
+            IFB Y, DL_UNLINKED
+                JMP ROME57C
+            ; this is 32 characters further
+            ; in the previous line
+            ADD [PNTR], HW_COLS
+            SUB X, 1
+            IFA X, -1
+                JMP ROME570
+:ROME57C    JSR ROME9F0 ; set PNT line pointer
+            SET A, HW_COLS-1
+            ADD X, 1
+:ROME582    SET Y, [X+LDTB1]
+            IFB Y, DL_UNLINKED
+                JMP ROME58C
+            ADD A, HW_COLS
+            ADD X, 1
+            JMP ROME582
+:ROME58C    SET [LNMX], A ; maximum line length
+            ;JMP ROMEA24
+            RTS
+:ROME591    IFN X, [LXSP]
+                RTS
+            JMP ROME6ED ; find beginning of logical line
+:LP2       ; get a character from the keyboard buffer
+:ROME5B4    SET Y, [KEYD] 
+            SET X, 0
+:ROME5B9    SET [KEYD+X], [KEYD+1+X]
+            ADD X, 1
+            IFN X, [NDX]
+               JMP ROME5B9
+            SUB [NDX], 1
+            SET A, Y
+            IAQ 0
+            SET EX, 0
+            RTS
+; WAIT FOR RETURN FOR KEYBOARD
+:ROME5CA    JSR ROME716 ; output to the screen
+:ROME5CD    SET A, [NDX]
+            SET [BLNSW], A  ; only blink if buffer is empty
+            SET [AUTODN], A ; Don't scroll until buffer is empty
+            IAQ 0 ; the c64 didn't have to manually enable ints here
+            IFE A, 0
+                JMP ROME5CD ; Loop until something changes?
+:ROME5D6    IAQ 1 ; SEI
+            IFE [BLNON], 0
+                JMP ROME5E7
+            ; restore haracter under cursor
+            SET [BLNON], 0
+            SET [BLNCT], 2
+            SET A, [PNT]
+            ADD A, [PNTR]
+            SET [A], [GDBLN]
+:ROME5E7    JSR ROME5B4 ; get character from buffer
+            ;IFN A, CBM_RUN ; RUN key
+            ;    JMP ROME5FE
+            ; copy LOAD and RUN into buffer
+            ;SET X, 9
+            ;IAQ 1
+            ;SET [NDX], X
+:ROME5F3    ;DAT 0x5000
+            ;JMP ROME5CD
+:ROME5FE    IFN A, CBM_RETURN 
+                JMP ROME5CA
+            SET Y, [LNMX]
+            SET [CRSW], Y
+            ADD Y, [PNT]
+:ROME606    SET A, [Y]
+            AND A, 0xFF
+            IFN A, 0x20 ; SPACE
+                JMP ROME60F
+            SUB Y, 1
+            IFN Y, [PNT] ; TODO: fix off-by-one
+                JMP ROME606
+:ROME60F    ADD Y, 1
+            SET [INDX], Y ; mark end of logical line
+:ROME612    SET Y, 0
+            SET [AUTODN], Y ;temporarily hold scrolling
+            SET [PNTR], Y ; beginning of line
+            SET [QTSW], Y ; turn off quote mode
+            SET A, [LXSP] ; get column at start of input
+            IFG [LXSP], 0x7F ; BMI
+                JMP ROME63A ; get chr from screen
+            SET X, [TBLX]  
+:ROME621    JSR ROME591
+            IFN X, [LXSP]
+                JMP ROME63A  ; get chr from screen
+            SET A, [LXSP+1]
+            SET [PNTR], A
+            IFU A, [INDX]  
+                JMP ROME63A  ; get chr from screen
+            JMP ROME65D
+:ROME632    ; get character from device 0 or 3
+            SET PUSH, Y
+            SET PUSH, X
+            IFE [CRSW], 0
+                JMP ROME5CD ; blink cursor, etc
+; get character from current screen line
+:ROME63A    SET Y, [PNTR]
+            ADD Y, [PNT] ; Y <- current character location
+            SET A, [Y]   ; A <- current character byte
+; TODO: handle RVS text somehow
+            AND A, 0xFF
+            SET [RAMD7], A
+            AND A, 0x3F
+            ; TODO: clean up for DCPU-16.
+:ROME642    ; we don't need anyu shifting here
+            ;SHL [RAMD7], 1
+:ROME646    IFC [RAMD7], 0x40  ; original 0x40
+                JMP ROME64A
+            BOR A, 0x80
+:ROME64A    IFC [RAMD7], 0x80         ; original 0x80
+                JMP ROME650
+            IFN X, [QTSW]
+                JMP ROME654
+:ROME650    IFB [RAMD7], 0x20   ; ASCII punctuation range
+                JMP ROME654    ; leave undisturbed
+:ROME652    BOR A, 0x40  ; 
+:ROME654    ADD [PNTR], 1
+            IFE A, CBM_QUOTE
+                XOR [QTSW], 1
+:ROME659    IFN Y, [INDX]
+                JMP ROME674
+:ROME65D    SET [CRSW], 0 ; 
+            SET A, CBM_RETURN
+            IFE [DFLTN], 3
+                JMP ROME66F
+            IFE [DFLTO], 3
+                JMP ROME672
+:ROME66F    JSR ROME716 ; output to the screen
+:ROME672    SET A, CBM_RETURN  ; Register EOL
+:ROME674    SET [RAMD7], A ; code of final character
+            SET X, POP
+            SET Y, POP
+            IFE A, 0xDE ; screen PI code
+                SET A, 0xFF ; petscii PI code
+:ROME682    SET EX, 0  ; clc
+                SET C, 0
+            RTS
+
+
+; fill screen at current position
+:ROME691    BOR A, 0x40
+:ROME693    
+            SET X, [COLOR]
+            IFE [RVS], 0
+               JMP ROME699
+:ROME697    SET X, [COLOR]
+            SHL X, 4
+	    SET B, EX
+            SHL X, 4
+            SET X, EX
+            SHL X, 4
+            BOR X, B
+            SHL X, 8 
+            BOR A, 0x80  ; this means "blink" on LEM.
+:ROME699    IFN [INSRT], 0
+                SUB [INSRT], 1
+            ; TODO: proper RVS handling
+            JSR ROMEA13 ; place character on screen
+            JSR ROME6B6 ; advance cursor
+
+; return from output to the screen
+:ROME6A8
+            SET J, POP
+            SET I, POP
+            SET Y, POP
+            IFN [INSRT], 0
+                SHR [QTSW], 1
+            SET X, POP
+            SET A, POP
+            SET EX, 0
+            IAQ 0  ; RE-ENABLE INTERRUPTS
+            RTS
+
+
+
+;advance the cursor, Get/insert new line
+:ROME6B6    JSR ROME8B3 ; move cursor to next line if 
+                   ; at end of line -- X will equal old line number
+            ADD [PNTR], 1
+:ROME6BB    SET A, [LNMX]
+            IFL A, [PNTR]
+                JMP ROME6C1
+            RTS
+:ROME6C1            ; this branch is for when you type past the maximum logical line length
+            IFE [LNMX], (HW_COLS*ROWS_IN_LINE)-1
+                JMP ROME6F7
+            IFN [AUTODN], 0  ; if scrolling enabled
+                JMP ROME967 ; insert blank line
+:ROME6CD    SET X, [TBLX]
+            IFL X, HW_ROWS
+                JMP ROME6DA ; skip scrolling
+            JSR ROME8EA  ; scroll the screen first
+            SUB [TBLX], 1
+            SET X, [TBLX]
+            ; link current line (X) with next line
+:ROME6DA    AND [LDTB1+X], 0xFFFF-DL_UNLINKED
+            BOR [LDTB1+1+X], DL_UNLINKED
+:ROME6E6    ADD [LNMX], HW_COLS
+:ROME6ED    IFB [LDTB1+X], DL_UNLINKED
+                JMP ROME6F4
+            SUB X, 1
+            IFN X, 0
+                JMP ROME6ED
+:ROME6F4    JMP ROME9F0 ; set PNT line pointer to X
+:ROME6F7    SUB [TBLX], 1
+            JSR ROME87C ; Move cursor to next line
+            SET [PNTR], 0 ; beginning of
+            RTS
+; move backwards over a line boundary
+:ROME701    SET X, [TBLX]
+        IFN X, 0 ; at top of screen?
+                JMP ROME70B
+            SET [PNTR], 0 ; ?  column 0
+            ;SET A, POP  ; not sure why we pop
+            ;SET A, POP
+            ;IFN A, 0
+                JMP ROME6A8
+:ROME70B    SUB X, 1
+            SET [TBLX], X
+            JSR ROME56C
+            SET [PNTR], [LNMX] ; end of line?
+            RTS
 
 
 ; In CBM BASIC, this was copied to 0073.
@@ -275,66 +591,6 @@
 ; kind of comparison.
 :INITAT
 :ROME3A2    dat 0x9000
-
-:INIT
-:ROME3BF
-            SET A, 0x4C ; ? 
-            SET [USRPOK], A
-            SET [RAM0311], FCERR
-            SET [RAM05], GIVAYF
-            SET [RAM03], ROMB1AA
-            ; skipped code that copies CHRGET/CHRGOT
-            SET [FOUR6], 2  ; single string descriptor
-            SET [BITS], 0
-            SET [CHANNL], 0
-            SET [LASTPT], 0
-            ; TODO: figure out why we're doing this
-            ; with the stack
-            ;SET [RAM01FD], 1
-            ;SET [RAM01FC], 1
-            SET [TEMPPT], TEMPST ; string stack to beginning
-            SET C, 1
-            SET B, 123
-            JSR MEMBOT
-            ; Set [TXTTAB] to beginning of BASIC area
-            SET [TXTTAB], X
-            SET B, 0xFFFF
-            SET C, 1
-            JSR MEMTOP
-            SET [MEMSIZ], X
-            SET [FREETOP], X
-            SET Y, [TXTTAB]
-            SET [Y], 0
-            ADD [TXTTAB], 1
-            RTS   ; 0x4B1?
-
-    ; PRINT BASIC STARTUP MESSAGES
-:ROME422
-            SET A, [TXTTAB]
-            JSR REASON
-            SET A, ROME473  ; COMMODORE 64 BASIC V2
-            JSR STROUT
-            ; Calculate number of basic bytes free
-            SET A, [MEMSIZ]
-            SUB A, [TXTTAB]
-            JSR LINPRT
-            SET A, WORDS  ; BASIC BYTES FREE
-            JSR STROUT
-            ; prefill keyboard buffer with 
-            JSR RUN_TEST_STRING
-            ; go to READY prompt
-            JMP ROMA644  ; NEW statement.
-            
-; startup messages
-
-:WORDS      DAT " BASIC BYTES FREE"
-            DAT CBM_RETURN, 0
-:ROME473    DAT CBM_CLR ;to clear the screen
-            DAT 0x99, "DCPU BASIC ALPHA 0307"
-            DAT 0x9A
-            DAT CBM_RETURN
-            DAT 0
-:ROME4AC    DAT 0x81
 
 
 ; DCPU hardware
@@ -545,6 +801,19 @@
 
 ; close serial bus device
 ;:ROMF642  RTS
+
+; check for STOP key (probably ESC)
+; return C=1 if STOP key pressed.
+:DEF_STOP
+:ROMF6ED    SET Z, 0
+			SET C, 0
+            IFN [RAM91], 0x7F
+                RTS
+            JSR ROMFFCC
+            SET [RAMC6], A
+            SET C, 1
+            SET Z, 1
+            RTS
 
 ; increment real time clock
 ;:ROMF89B  RTS
