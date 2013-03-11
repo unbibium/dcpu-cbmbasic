@@ -41,14 +41,17 @@ mostly like they do on the C64:
 * Immediate mode
 * BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, ON,
                   NEW, STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT
-* BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$()
+* BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$(), ASC
+* PETSCII control codes for color change, reverse text, cursor
+  movement, and switching between graphics and lowercase character
+  sets.
 * BASIC keyword abbreviations with shifted second letters
 * The ? abbreviation for PRINT
 * Expressions involving floating-point addition, subtraction,
   and multiplication to 32-bit accuracy.
 * Floating point division to 16-bit accuracy, more for special
   cases like division by 5 or 3.
-* Comparison operators, NOT, AND, and OR.
+* Comparison operators for strings and variables, NOT, AND, and OR.
 * String literals and concatenation.
 * Allocating, setting, and retrieving string variables like A$
 * Allocating, setting, and retrieving float variables like A
@@ -56,6 +59,7 @@ mostly like they do on the C64:
 Just about anything else won't work, and may even crash the machine.
 Here's what's missing, in the rough order of when I'm going to add it:
 * the functions MID$, ASC, and VAL
+* Integer variables like A%
 * Arrays
 * Program storage (LOAD, SAVE, VERIFY)
 * Garbage collection
