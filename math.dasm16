@@ -16,7 +16,6 @@
 :RAM5D 
 :DECEXP DAT 0 ; decimal exponent during FIN/FOUT
 :RAM5E  DAT 0 ; Number of digits during FIN?
-:RAM5F  DAT 0 ; ...
 :RAM60  DAT 0 ; sign of exponent operator in FIN
 :FAC1    ; Floating Point Accumulato0r 
 :RAM61   ; Exponent (only 8 bits used)
