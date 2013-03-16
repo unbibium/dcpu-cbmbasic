@@ -102,10 +102,14 @@
 :FOUR6
 :RAM53  DAT 0
 :RAM55  DAT 0
+; Parameters for memory copying and manipulation
 :RAM58
 :HIGHDS DAT 0
 :RAM5F
-:LOWTR  DAT 0 ; ...
+:LOWTR  DAT 0
+:RAM5A
+:HIGHTR DAT 0
+
 :FBUFPT ; Series Evaluation Pointer
 :RAM71  DAT 0
 
@@ -609,25 +613,33 @@
             
 
 :BLTU
-; Parameters in [RAM5F], [RAM5A], and [RAM58]
-;               and A should contain the value of [RAM58].
+; ----------------------------------------------------------------------------
+; MOVE BLOCK OF MEMORY UP
+;
+; ON ENTRY:
+;	(Y,A) = (HIGHDS) = DESTINATION END+1     (58)
+;	(LOWTR) = LOWEST ADDRESS OF SOURCE       (5F)
+;	(HIGHTR) = HIGHEST SOURCE ADDRESS+1      (5A)
+; ----------------------------------------------------------------------------
+; Parameters in [LOWTR], [HIGHTR], and [HIGHDS]
+;               and A should contain the value of [HIGHDS].
 ; RETURN: ?
 :ROMA3B8        JSR REASON      ; garbage collect?
                 SET [STREND], A ; returned start of free RAM
-:ROMA3BF        SET B, [RAM5F] ; source start address
-                SET J, [RAM5A] ; source end address
-                SET I, [RAM58] ; destimation end address
+:BLTU2
+:ROMA3BF        SET B, [LOWTR] ; source start address
+                SET J, [HIGHTR] ; source end address
+                SET I, [HIGHDS] ; destimation end address
                 IFE J, B
                     RTS
 :ROMA3BG        STD [I], [J]
                 IFN J, B
                     SET PC, ROMA3BG
                 RTS
-; test for 2 * A bytes free on stack
+
+; test for A bytes free on stack
 :GETSTK         
-    MUL A, 2
-    ADD A, 52
-    ADD A, STACK
+    ADD A, STACK+52
     IFG A, SP
         JMP OMERR
     RTS
@@ -724,7 +736,7 @@
             IFE C, 0 ; line number not found
                 JMP ROMA4ED  ; insert only
 ; Delete old line.
-:ROMA4A9    SET I, [RAM5F] ; Pointer to matched line
+:ROMA4A9    SET I, [LOWTR] ; Pointer to matched line
             SET J, [I]     ; Pointer to following line
             STD B, [VARTAB] ; End of program text
             SUB B, J
@@ -752,16 +764,16 @@
             IFE [VARTAB], 0
                 JMP VARTABCRASH
             SET A, [VARTAB]
-            SET [RAM5A], A  ; source end address
+            SET [HIGHTR], A  ; source end address
             ADD A, [COUNT]  ; add number of characters
-            SET [RAM58], A  ; destination end address
+            SET [HIGHDS], A  ; destination end address
             JSR BLTU        ; Move memory
             SET [RAM01FF], [LINNUM]
 :ROMA517    SET [VARTAB], [STREND]
             SET Y, [COUNT]
             SUB Y, 1
             ; copy line into memory
-            SET I, [RAM5F] ; pointer to new spot in memory
+            SET I, [LOWTR] ; pointer to new spot in memory
             ADD I, Y
             STI J, RAM01FE
             ADD J, Y
@@ -921,15 +933,15 @@
 
 ; SEARCH for a line in a program
 ; pass address of first line to check in A (originally A+X)
-; returns C=1 and address in RAM5F if found
+; returns C=1 and address in LOWTR if found
 ; returns C=0 if not found
 
 :FINDLN
 :ROMA613    SET A, [TXTTAB]     ; $2B
 :FINDLNA
 :ROMA617    SET I, 1
-:ROMA619    SET [RAM5F], A
-            ADD I, [RAM5F]  ; I = NEXT line in linked list
+:ROMA619    SET [LOWTR], A
+            ADD I, [LOWTR]  ; I = NEXT line in linked list
 :ROMA61D    SET A, [I] ; get address of that line
             IFE A, 0
                 JMP ROMA640
@@ -1014,9 +1026,9 @@
             IFN [LINNUM], 0
                 JMP ROMA6C9
             SET [LINNUM], -1
-; LIST LINES from RAM5F to LINNUM
+; LIST LINES from LOWTR to LINNUM
 :ROMA6C9    SET [RAM0F], 1
-            SET Y, [RAM5F]
+            SET Y, [LOWTR]
 :ROMA6CD    IFE [Y], 0     ; no link to next line
                 JMP ROMA714
             JSR ROMA82C ; check STOP key
@@ -1040,8 +1052,8 @@
             SET A, [Y]
             IFN A, 0
                 JMP QPLOP ; Print with tokens expanded
-            SET Y, [RAM5F] ; follow link to nxt line
-            SET [RAM5F], [Y] ; cache link to line after that
+            SET Y, [LOWTR] ; follow link to nxt line
+            SET [LOWTR], [Y] ; cache link to line after that
             IFN [Y], 0
                 JMP ROMA6C9
 :ROMA714    JMP ROME386 
@@ -1270,10 +1282,10 @@
                 SET A, [TXTTAB] ; start at beginning
             IFE [CURLIN], [LINNUM]
                 SET A, [TXTTAB] ; start at beginning
-            JSR FINDLNA ; set [RAM5F] to address of target
+            JSR FINDLNA ; set [LOWTR] to address of target
             IFE C, 0 ; BCC $A8E3
                 JMP ROMA8E3 ; throw ?UNDEF'D STATEMENT
-:ROMA8C5    SET A, [RAM5F]
+:ROMA8C5    SET A, [LOWTR]
             SUB A, 1
 :ROMA8C9    SET [RAM7A], A  ; got new location
             RTS
@@ -2453,7 +2465,7 @@
             SET Y, [VARTAB]  ; pointer
             SET A, [VARNAM]    ; first char of cariable
             SET B, [VARNAM+1]  ; 2nd char of variable
-:ROMB0F3    SET [RAM5F], Y
+:ROMB0F3    SET [LOWTR], Y
             IFE Y, [ARYTAB] ; end of table?
                 JMP NOTFNS         ; Create a variable
             IFN A, [Y]
@@ -2495,15 +2507,15 @@
                 JMP ROMB143
             IFE A, 0x54 ; T
                 JMP ROMAF08
-:ROMB143    SET [RAM5F], [ARYTAB] ; start of source
+:ROMB143    SET [LOWTR], [ARYTAB] ; start of source
             SET A, [STREND] ; end of all variables
-            SET [RAM5A], A  ; end of source
+            SET [HIGHTR], A  ; end of source
             ADD A, 5        ; room for one variable
-            SET [RAM58], A ; end of destination
+            SET [HIGHDS], A ; end of destination
             JSR BLTU
             ; move array table up
-            SET [ARYTAB], [RAM58]
-            SET Y, [RAM5F]
+            SET [ARYTAB], [HIGHDS]
+            SET Y, [LOWTR]
             ; bytes 1&2: name
             SET [Y], [VARNAM]
             SET [Y+1], [VARNAM+1]
@@ -2526,7 +2538,7 @@
 ; now: ARYPNT = A + #DIMS + 4  
 ; ----------------------------------------------------------------------------
 :GETARY
-:ROMB194    SET [RAM5F], A
+:ROMB194    SET [LOWTR], A
             SET B, [COUNT]
             ADD B, 4
             ADD B, A
@@ -2629,7 +2641,7 @@
             SET A, 36 ; debug
             JSR CHROUT
 :ROMB256    SET A, [COUNT] ; number of dimensions in sought array
-            SET Y, [RAM5F] ; pointer to found array
+            SET Y, [LOWTR] ; pointer to found array
             IFN A, [Y+3]   ; number of dimensions in found array
                 JMP BSERR
             SET A, 33 ; debug
@@ -2653,7 +2665,7 @@
 :MAKE_NEW_ARRAY
 :ROMB261    JSR GETARY
             JSR REASON
-            SET Y, [RAM5F]
+            SET Y, [LOWTR]
             SET X, SIZEOF_FLOAT
             SET A, [VARNAM]
             SET [Y], A
@@ -2693,8 +2705,8 @@
             ; put size of memory block in the array
             ; can't make a direct pointer because this
             ; memory gets moved around a lot.
-            SUB A, [RAM5F]
-            SET Y, [RAM5F]
+            SUB A, [LOWTR]
+            SET Y, [LOWTR]
             SET [Y+2], A
             ; blank out the array elements
             SET I, [STREND] ; end of memory
@@ -2708,11 +2720,11 @@
             IFN [DIMFLG], 0
                 RTS  ; DIM'd the array, don't need to access it.
             ADD Y, 1
-            SET [RAM5F], Y                  
+            SET [LOWTR], Y                  
 ; compute reference to array element
 ; HIGHDS must have been set by GETARY.
 :FIND_ARRAY_ELEMENT
-:ROMB2EA    SET Y, [RAM5F]
+:ROMB2EA    SET Y, [LOWTR]
             ADD Y, 3
             SET [COUNT], [Y]
             SET [RAM71], 0
@@ -3037,12 +3049,12 @@
             IFL A, [FREETOP]
                 JMP ROMB5DC
             JMP ROMB5F6
-:ROMB5DC    IFL A, [RAM5F]
+:ROMB5DC    IFL A, [LOWTR]
                 JMP ROMB5F6
-            IFN A, [RAM5F]
+            IFN A, [LOWTR]
                 JMP ROMB5E6
             JMP ROMB5F6
-:ROMB5E6    SET [RAM5F], A
+:ROMB5E6    SET [LOWTR], A
             SET A, [INDEX]
             SET [DEFPNT], A
             SET [RAM55], [FOUR6]
@@ -3070,16 +3082,16 @@
             SET I, [DEFPNT] ; ($4E),Y
             ADD I, Y
             SET A, [I]
-            ADD A, [RAM5F]  ; 16-bit
-            SET [RAM5A], A
+            ADD A, [LOWTR]  ; 16-bit
+            SET [HIGHTR], A
             SET A, [FREETOP]
-            SET [RAM58], A ; End of destination
+            SET [HIGHDS], A ; End of destination
 :ROMB628    JSR ROMA3BF ; copy memory
 :ROMB62B    SET Y, [RAM55]
             ADD Y, 1
             SET I, [DEFPNT]
             ADD I, Y
-            SET [I], [RAM58] ; Points to end of destination
+            SET [I], [HIGHDS] ; Points to end of destination
             ; A should contain something
             ; suitable to be stored in [FREETOP] ($33)
             JMP ROMB52A

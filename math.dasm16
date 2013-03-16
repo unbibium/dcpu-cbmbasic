@@ -10,8 +10,6 @@
 ; they use registers instead of memory.
 ;
 :RAM57  DAT 0, 0, 0
-:RAM58 DAT 0
-:RAM5A DAT 0
 :RAM5C  DAT 0, 0, 0
 :RAM5D 
 :DECEXP DAT 0 ; decimal exponent during FIN/FOUT
