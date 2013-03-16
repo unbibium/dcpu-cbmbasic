@@ -1058,7 +1058,7 @@
                 JMP ROMA6F3   ; print literal
             ; token value detected
 :ROMA724    SUB A, 0x7F
-            SET [RAM49], Y
+            SET [FORPNT], Y
             SET Y, TOKEN_NAMES-1
 :ROMA72C    SUB A, 1 ; Next token
             IFE A, 0
@@ -1282,7 +1282,7 @@
 :STMT_RETURN
 :ROMA8D2    IF_NOT_NEXT_STMT
                 RTS
-            BOR [RAM49], 0xFF00 ; in case GOSUB from immediate
+            BOR [FORPNT], 0xFF00 ; in case GOSUB from immediate
             JSR FNDFOR   ; Search for FOR blocks on stack
             SET SP, X
             IFE PEEK, BASIC_GOSUB_TOKEN ; CMP #$8D   ; GOSUB
@@ -1419,12 +1419,13 @@
 ; assign to integer
 :ROMA9C4    JSR ROUND
             JSR AYINT ; convert float to int
-            SET [RAM49], [FACHO]
+            SET A, [FORPNT]
+            SET [A], [FACHO+1]  ; store int result
             RTS
 
 ;assign to string
 :ROMA9D9    SET A, POP ; discard INTFLG from STMT_LET
-:ROMA9DA    IFN [RAM49], ROMBF13   ; I think NOTFNS does this
+:ROMA9DA    IFN [FORPNT], ROMBF13   ; I think NOTFNS does this
                 JMP ROMAA2C
             ;assign to TI$
             JSR ROMB6A6
@@ -1482,7 +1483,7 @@
 :ROMAA68    SET [DSCPNT], A
             JSR FRETMS ; herp derp stack
             SET A, [DSCPNT]
-            SET Y, [RAM49]
+            SET Y, [FORPNT]
             SET [Y], [A]
             SET [Y+1], [A+1]
             SET [Y+2], [A+2]
@@ -2239,8 +2240,9 @@
 
 :ROMAF5D    IFC [INTFLG], 0x80 
                 JMP ROMAF6E
-            SET A, [RAM64]  ; is integer
-            JMP GIVAYF
+            SET A, [RAM64]  ; get pointer to integer
+			SET A, [A]      ; follow pointer
+	        JMP GIVAYF
 
 :ROMAF6E    JSR ROMAF14  ; check variable pointer range?
             IFE C, 0 ; Not found?
