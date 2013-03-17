@@ -2648,14 +2648,10 @@
             IFN [DIMFLG], 0
                 JMP ERROR
             JSR GETARY
-            SET A, 36 ; debug
-            JSR CHROUT
 :ROMB256    SET A, [COUNT] ; number of dimensions in sought array
             SET Y, [LOWTR] ; pointer to found array
             IFN A, [Y+3]   ; number of dimensions in found array
                 JMP BSERR
-            SET A, 33 ; debug
-            JSR CHROUT
             SET A, [COUNT]
             JMP FIND_ARRAY_ELEMENT
 
@@ -2741,25 +2737,15 @@
             SET [COUNT], [Y]
             SET [RAM71], 0
 :ROMB2F2    ADD Y, 1   ; point to next dimension
-            SET A, POP
+            SET A, POP ; requested index of current dimension
             SET [RAM64], A
             IFL A, [Y]
                 JMP ROMB30E
-            ; this is where the A(2) fails
-            SET PUSH, [Y]
-            JSR LINPRT ; print A for debugging
-            SET A, POP
-            JSR LINPRT
-            SET A, 13
-            JSR CHROUT
             JMP BSERR ; ?BAD SUBSCRIPT
 :ROMB30B    JMP OMERR   ;?OUT OF MEMORY
 :ROMB30E    IFE [RAM71], 0
                 JMP ROMB320
-            ; multidimensional
-            MUL [RAM71], [Y] ; ???
-            SET EX, 0xB30E
-            JMP CRASH
+            MUL [RAM71], [Y]
 :ROMB320    ADD [RAM71], A
             SUB [COUNT], 1
             IFN [COUNT], 0

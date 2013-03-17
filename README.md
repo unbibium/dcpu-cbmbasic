@@ -57,12 +57,11 @@ mostly like they do on the C64:
   * String variables like A$
   * Float variables like A
   * Integer variables like A%
-* One-dimensional arrays for all the above types
+* Multi-dimensional arrays for all the above types
 
 Just about anything else won't work, and may even crash the machine.
 Here's what's missing, in the rough order of when I'm going to add it:
-* Multi-dimensional arrays
-* the functions MID$, and VAL
+* other functions (MID$, VAL, PEEK, POS)
 * Program storage (LOAD, SAVE, VERIFY)
 * Garbage collection
 * File access (OPEN, CLOSE, GET, GET#, INPUT#, PRINT#, CMD)
