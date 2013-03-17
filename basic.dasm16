@@ -5,6 +5,7 @@
 ;
 ;  TODO: add list of kernal dependencies.
 ;
+;
 :RAM03  
 :ADRAY1 DAT BLANK
 :RAM05  
@@ -146,6 +147,7 @@
 :RAM008Z        SET Z, 1
             RTS
 
+; need better names for these
 .DEFINE IF_NEXT_STMT     IFN Z, 0
 .DEFINE IF_NOT_NEXT_STMT IFE Z, 0
 
@@ -267,9 +269,9 @@
         DAT 0x7F
         DAT ROMBF7B   ; power
         DAT 0x50
-        DAT ROMAFE9   ; AND
+        DAT ANDOP   ; AND
         DAT 0x46
-        DAT ROMAFE6   ; OR
+        DAT OROP   ; OR
 :TBL_OP_NEG
         DAT 0x7D
         DAT NEGOP   ; negative
@@ -633,12 +635,14 @@
 :BLTU2
 :ROMA3BF        SET B, [LOWTR] ; source start address
                 SET J, [HIGHTR] ; source end address
-                SET I, [HIGHDS] ; destimation end address
-                IFE J, B
+                IFE J, B    ; move no bytes
                     RTS
+                ; pre-decrement
+                STD I, [HIGHDS] ; destimation end address
 :ROMA3BG        STD [I], [J]
                 IFN J, B
-                    SET PC, ROMA3BG
+                    JMP ROMA3BG
+				SET [I], [J] ; last byte
                 RTS
 
 ; test for A bytes free on stack
@@ -1184,7 +1188,7 @@
 
 ; execute command  at RAM7A.
 ; its first character or token is in A
-:ROMA7ED    IFN Z, 0  ; If zero bit set
+:ROMA7ED    IF_NEXT_STMT  ; If zero bit set
                 RTS
 :ROMA7EF    SUB A, 0x80
             IFU A, 0   
@@ -1256,7 +1260,7 @@
             SET A, 0 
             JSR SETMSG
             SET Z, POP
-            IFN Z, 0 ; Not zero
+            IF_NEXT_STMT ; Not zero
                 JMP ROMA659 ; clear variable memory
 
 :ROMA87D    JSR ROMA660      ; do CLR
@@ -1442,9 +1446,10 @@
             SET [A], [FACHO+1]  ; store int result
             RTS
 
+
 ;assign to string
 :ROMA9D9    SET A, POP ; discard INTFLG from STMT_LET
-:ROMA9DA    IFN [FORPNT], ROMBF13   ; I think NOTFNS does this
+:ROMA9DA    IFN [FORPNT], C_ZERO ; TI$? ($BF on C64, $D0 or $DE on others)
                 JMP ROMAA2C
             ;assign to TI$
             JSR ROMB6A6
@@ -1498,14 +1503,13 @@
             SET [RAM6F], [DSCPNT]  ;TODO: check order
             JSR MOVINS  ; move string
             SET A, FACEXP
-; move 3-byte descriptor into variable
+; move 2-byte descriptor into variable
 :ROMAA68    SET [DSCPNT], A
             JSR FRETMS ; herp derp stack
             SET A, [DSCPNT]
             SET Y, [FORPNT]
-            SET [Y], [A]
-            SET [Y+1], [A+1]
-            SET [Y+2], [A+2]
+            SET [Y], [A]      ; length
+            SET [Y+1], [A+1]  ; address
             RTS
 
 ; add next digit to float accum
@@ -2307,9 +2311,9 @@
 
 ; OR/AND operators
 
-:ROMAFE6    SET Y, -1
+:OROP       SET Y, -1
             IFN Y, -1 ; skip next
-:ROMAFE9    SET Y, 0
+:ANDOP      SET Y, 0
             SET [RAM0B], Y
             JSR AYINT    ; float to integer
             SET A, [RAM64]
@@ -2406,8 +2410,8 @@
             JMP ROMBC3C   ; convert A to float
 
 :ROMB07E    JSR CHKCOM 
-:STMT_DIM   SET X, A  ; DIMFLG to non-zero
-            JSR ROMB090 ; subset of PTRGET
+:STMT_DIM   SET [DIMFLG], A  ; DIMFLG to non-zero
+            JSR ROMB092
             JSR CHRGOT
             IF_NOT_NEXT_STMT
                 JMP ROMB07E
@@ -2419,15 +2423,15 @@
 ; the variable name.
 ; Returns pointer in Y (originally AY)
 :PTRGET
-:ROMB08B    SET X, 0
-            JSR CHRGOT
-:ROMB090    SET [DIMFLG], X
+:ROMB08B    JSR CHRGOT
+:ROMB090    SET [DIMFLG], 0
 :ROMB092    SET [VARNAM], A ; store first letter of variable
             ; throw SYNTAX if first character is not a letter.
             JSR CHRGOT
             JSR ISALPHA
             IFE C, 0
                 JMP SNERR
+        	SET X, 0
 :ROMB09F    SET [VALTYP], 0  ; numeric
             SET [INTFLG], 0
             JSR CHRGET
@@ -2488,15 +2492,18 @@
             IFG A, 0x5B ; Z
                 SET C, 0
             RTS
+; the NOTFNS routine points here when there's an array,
+; but there's nothing special there
+:C_ZERO
+:ROMBF13    DAT 0,0
 
 :NOTFNS ; Create a new BASIC variable
 ; VARIABLE POINTERS ARE 5 WORDS INSTEAD OF 7 BYTES
 ; todo: figure out what was pushed on the stack
-:ROMB11D    SET A, PEEK
-            IFN A, 0x2A ; Array?
+:ROMB11D    IFN PEEK, 0x2A ; Array?
                 JMP ROMB128
             ; i am stumped as of now
-:ROMB123    SET Y, ROMBF13 ; ?
+:ROMB123    SET Y, C_ZERO ; ?
             RTS
 :ROMB128    SET A, [VARNAM]
             SET Y, [VARNAM+1]
@@ -2517,7 +2524,7 @@
             SET [HIGHDS], A ; end of destination
             JSR BLTU
             ; move array table up
-            SET [ARYTAB], [HIGHDS]
+            ADD [ARYTAB], 5
             SET Y, [LOWTR]
             ; bytes 1&2: name
             SET [Y], [VARNAM]
@@ -2725,17 +2732,17 @@
             ADD Y, 1
             SET [LOWTR], Y                  
 ; compute reference to array element
+; [LOWTR+3] POINTS AT # OF DIMS IN ARRAY DESCRIPTOR
+; THE SUBSCRIPTS ARE ALL ON THE STACK AS INTEGERS
 ; HIGHDS must have been set by GETARY.
 :FIND_ARRAY_ELEMENT
 :ROMB2EA    SET Y, [LOWTR]
             ADD Y, 3
             SET [COUNT], [Y]
             SET [RAM71], 0
-:ROMB2F2    ADD Y, 1
+:ROMB2F2    ADD Y, 1   ; point to next dimension
             SET A, POP
             SET [RAM64], A
-            SET [SCREENMEM+33], A
-            BOR [SCREENMEM+33], 0xE000
             IFL A, [Y]
                 JMP ROMB30E
             ; this is where the A(2) fails
@@ -2753,9 +2760,7 @@
             MUL [RAM71], [Y] ; ???
             SET EX, 0xB30E
             JMP CRASH
-:ROMB320    ADD [RAM71], [RAM64]
-            SET [SCREENMEM+34], [RAM71]
-            BOR [SCREENMEM+34], 0xD000
+:ROMB320    ADD [RAM71], A
             SUB [COUNT], 1
             IFN [COUNT], 0
                 JMP ROMB2F2
@@ -2765,15 +2770,10 @@
                 SUB A, SIZEOF_FLOAT-SIZEOF_STR
             IFB [VARNAM+1], 0x80 ; both type bits set (can't dim functions)
                 SUB A, SIZEOF_STR-SIZEOF_INT
-            SET [SCREENMEM+32], A
-            AND [SCREENMEM+32], 0x00FF
-            BOR [SCREENMEM+32], 0x7000
             MUL A, [RAM71]
-            SET [SCREENMEM+35], A
-            AND [SCREENMEM+35], 0x00FF
-            BOR [SCREENMEM+35], 0x7000
-            ADD A, [HIGHDS]
-            SET [VARPNT], A
+            ADD Y, A
+            ADD Y, 1
+            SET [VARPNT], Y
 :ROMB34B    RTS
 
 ; fre(0)
@@ -3198,7 +3198,7 @@
             SET A, POP
             JMP ROMB4CA ; save descriptor in $61 on stack
 :LEFTD
-:ROMB700    JSR ROMB761
+:ROMB700    JSR PREAM
             SET X, 0
 :ROMB706    IFL A, [Y]  ; if parameter is longet than length
                 JMP ROMB70C
@@ -3217,7 +3217,7 @@
             JSR ROMB68C ; move string with length A
 :ROMB729    JMP ROMB4CA
 :RIGHTD
-:ROMB72D    JSR ROMB761 ; get parameters
+:ROMB72D    JSR PREAM ; get parameters
             ; set starting index to string length
             ; minus the parameter
             SET X, [Y]
@@ -3230,7 +3230,7 @@
                 JMP ROMB748 ; default to end-of-string
             JSR CHKCOM
             JSR ROMB79E  ; GETBYTC
-:ROMB748    JSR ROMB761 ; get first two parameters
+:ROMB748    JSR PREAM ; get first two parameters
             IFE A, 0
             JMP ROMB248
             SUB A, 1
@@ -3256,6 +3256,7 @@
 ; get first 2 parameters for LEFT$/RIGHT$/MID$
 ; returns A as numeric parameter
 ; returns Y as pointer to string descriptor
+:PREAM
 :ROMB761    JSR CHKCLS
             SET X, POP ; RTS address (was 2)
             SET A, POP ; discard - was 2

@@ -41,7 +41,7 @@ mostly like they do on the C64:
 * Immediate mode
 * BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, ON,
                   NEW, STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT
-* BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$(), ASC
+* BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$, ASC
 * PETSCII control codes for color change, reverse text, cursor
   movement, and switching between graphics and lowercase character
   sets.
@@ -53,14 +53,16 @@ mostly like they do on the C64:
   cases like division by 5 or 3.
 * Comparison operators for strings and variables, NOT, AND, and OR.
 * String literals and concatenation.
-* Allocating, setting, and retrieving string variables like A$
-* Allocating, setting, and retrieving float variables like A
+* Allocating, setting, and retrieving:
+  * String variables like A$
+  * Float variables like A
+  * Integer variables like A%
+* One-dimensional arrays for all the above types
 
 Just about anything else won't work, and may even crash the machine.
 Here's what's missing, in the rough order of when I'm going to add it:
-* the functions MID$, ASC, and VAL
-* Integer variables like A%
-* Arrays
+* Multi-dimensional arrays
+* the functions MID$, and VAL
 * Program storage (LOAD, SAVE, VERIFY)
 * Garbage collection
 * File access (OPEN, CLOSE, GET, GET#, INPUT#, PRINT#, CMD)
@@ -68,6 +70,7 @@ Here's what's missing, in the rough order of when I'm going to add it:
 * POKE and PEEK (I'll need to stabilize the memory map first)
 * Trigonometry (SIN, COS, TAN, ATN)
 * Special variables ST, TI, TI$
+* Functions (DEF FN)
 
 Additionally, the code needs to be optimized and cleaned up.
 Many speed gains are possible, though it may never be as fast
