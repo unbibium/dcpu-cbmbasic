@@ -1,3 +1,10 @@
+;
+;  Main BASIC interpreter
+;
+;  requires math.dasm16
+;
+;  TODO: add list of kernal dependencies.
+;
 :RAM03  
 :ADRAY1 DAT BLANK
 :RAM05  
@@ -44,9 +51,6 @@
 :RAM22
 :INDEX  DAT BLANK, BLANK
 :RAM28  DAT BLANK
-:RESHO ; multiplication argument - mantissa only
-:RAM26  DAT 0
-:RAM27  DAT 0, 0
 ; Pointer to the start of BASIC program text
 :RAM2B  
 :TXTTAB DAT BASICMEM+1
@@ -759,14 +763,10 @@
                 JMP MAIN ; delete only; return to prompt
             ; Make room for new line by moving the rest
             ; of the program up
-:ROMA4F8    SET EX, 0xA4F8
-            ; sanity check -- something's clearing VARTAB
-            IFE [VARTAB], 0
-                JMP VARTABCRASH
-            SET A, [VARTAB]
-            SET [HIGHTR], A  ; source end address
+:ROMA4F8    SET A, [VARTAB]
+            SET [HIGHTR], A  ; source end address + 1
             ADD A, [COUNT]  ; add number of characters
-            SET [HIGHDS], A  ; destination end address
+            SET [HIGHDS], A  ; destination end address + 1
             JSR BLTU        ; Move memory
             SET [RAM01FF], [LINNUM]
 :ROMA517    SET [VARTAB], [STREND]
@@ -817,6 +817,17 @@
             ADD X, 1
             IFL X, HW_COLS*ROWS_IN_LINE
                 JMP ROMA562
+            IFE DEBUG_SNERR, 0
+                JMP LTLERR
+            ; to help diagnose screen editor issues.
+            ; how long did it think the line was?
+            SET A, X
+            JSR LINPRT
+            SET A, 0x62
+            JSR CHROUT
+            SET A, HW_COLS*ROWS_IN_LINE
+            JSR LINPRT
+:LTLERR
             SET X, 0x17 ; ?LINE TOO LONG
             JMP ERROR
             
@@ -1135,10 +1146,6 @@
             JSR ROMAE38  ; push STEP with separate sign byte +4
             SET PUSH, [FORPNT] ; pointer to increment variable +1
             SET PUSH, BASIC_FOR_TOKEN
-            ;SET A, PEEK
-            ;SET B, PICK 1
-            ;SET C, PICK 2
-            ;DAT 0x0C00
 
 ; execute next statement
 
@@ -1246,14 +1253,14 @@
 
 :STMT_RUN
 :ROMA871    SET PUSH, Z
-            SET A, 0
-:ROMA874    JSR SETMSG
-:ROMA877    SET Z, POP
-:ROMA878    IFN Z, 0 ; Not zero
+            SET A, 0 
+            JSR SETMSG
+            SET Z, POP
+            IFN Z, 0 ; Not zero
                 JMP ROMA659 ; clear variable memory
 
 :ROMA87D    JSR ROMA660      ; do CLR
-:ROMA880    JMP ROMA897      ; do GOTO
+            JMP ROMA897      ; do GOTO
 
 ; GOSUB command
 
@@ -1283,7 +1290,7 @@
             IFE [CURLIN], [LINNUM]
                 SET A, [TXTTAB] ; start at beginning
             JSR FINDLNA ; set [LOWTR] to address of target
-            IFE C, 0 ; BCC $A8E3
+            IFE C, 0        ; line not found
                 JMP ROMA8E3 ; throw ?UNDEF'D STATEMENT
 :ROMA8C5    SET A, [LOWTR]
             SUB A, 1
@@ -1386,7 +1393,7 @@
             SET A, POP ; past end of list; do nothing.
             RTS         
 
-; get decimal number into $14/$15
+; get decimal literal, i.e. a line number, into LINNUM.
 ; C should be zero coming in, and
 ; A should be the result of a CHRGET.
 ; throws an illegal quantity error if over 63999.
@@ -1672,10 +1679,6 @@
             IFE A, -1 ; skip next
 :ROMAB45    SET A, 0x3F  ; question mark
 :ROMAB47    JSR ROME10C
-            ; AND #$FF
-            SET Z, 0
-            IFE A, 0
-                SET Z, 1
 :ROMAB4C    RTS
 
 ; Read errors
@@ -2269,7 +2272,7 @@
             IFN Y, 0x54  ; T
                 JMP ROMAFA0
             JSR ROMFFB7  ; get status
-            JMP ROMBC3C
+            JMP ROMBC3C  ; convert A to float
 :ROMAFA0    SET A, [RAM64]
             JMP MOVFM
 
@@ -2400,7 +2403,7 @@
             AND A, [RAM12]   ; comparison
             IFN A, 0
                 SET A, -1
-            JMP ROMBC3C
+            JMP ROMBC3C   ; convert A to float
 
 :ROMB07E    JSR CHKCOM 
 :STMT_DIM   SET X, A  ; DIMFLG to non-zero
@@ -2789,12 +2792,6 @@
             JMP FADD
 :P65536     DAT 0x91, 0, 0
 
-:GIVAYF ;Convert 16-Bit Signed Integer to Floating Point
-:ROMB391    SET [VALTYP], 0   ; numeric
-            SET [FACHO], A
-            SET X, 0x90
-            JMP ROMBC44 ; normalize
-            
 
 ; throw ?ILLEGAL DIRECT if not in direct mode
 :ERRDIR
@@ -3082,11 +3079,10 @@
             SET I, [DEFPNT] ; ($4E),Y
             ADD I, Y
             SET A, [I]
-            ADD A, [LOWTR]  ; 16-bit
-            SET [HIGHTR], A
-            SET A, [FREETOP]
-            SET [HIGHDS], A ; End of destination
-:ROMB628    JSR ROMA3BF ; copy memory
+            ADD A, [LOWTR]
+            SET [HIGHTR], A         ; Source end + 1
+            SET [HIGHDS], [FREETOP] ; Destination end + 1
+:ROMB628    JSR BLTU2 ; copy memory
 :ROMB62B    SET Y, [RAM55]
             ADD Y, 1
             SET I, [DEFPNT]

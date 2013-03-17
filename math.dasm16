@@ -46,6 +46,9 @@
 :RAM6F  DAT 0
 :FACOV  ;low order mantissa byte for rounding
 :RAM70  DAT 0
+:RESHO ; multiplication argument - mantissa only
+:RAM26  DAT 0
+:RAM27  DAT 0, 0
 :RNDX   ; random number seed
 		DAT 0x80, 0x4FC7, 0x5258
 
@@ -215,7 +218,7 @@
 :ROMB947    XOR [FACSGN], -1 
 :ROMB94D    XOR [FACHO], -1
             XOR [FACHO+1], -1
-            XOR [FACOV], 0xFFFF  ; ???
+            XOR [FACOV], 0xFFFF
             ADD [FACOV], 0x0001
             ADX [FACHO+1], 0
             ADX [FACHO], 0
@@ -323,8 +326,8 @@
 :ROMBA2B    IFE A, 0  
                 RTS ; anything times 0 = 0
             JSR MULDIV ; add exponents
-            SET [RESHO], 0
-            SET [RESHO+1], 0
+            ;SET [RESHO], 0
+            ;SET [RESHO+1], 0
 :ROMBA3D    SET A, [FACOV]
             JSR ROMBA59  ; multiply A and add to RESHO
             SET A, [FACHO+1]
@@ -348,8 +351,6 @@
             ADD [FACOV], Y
             ADX [RESHO+1], X
             ADX [RESHO], 0
-            IFN EX, 0 ; should be impossible
-                JMP FACCRASH ;unless i'm very wrong
             RTS
 
 ; move float indexed by AY into second float accu
@@ -433,18 +434,18 @@
 
 ; reciprocal multiplier for 1/10 for parsing float literals
 :DIV10
-        SUB [FACEXP], 3 ; * 0.0625
-        JSR MOVAF  ; ARG = FAC
+        SUB [FACEXP], 3 ; FAC <- FAC / 16
+        JSR MOVAF       ; ARG = FAC
         SET [ARISGN], 0
-; reciprocal multiplier for 1/1.25 (3, 6, 12, etc)
+; reciprocal multiplier for 1/1.25 (5, 10, 20, etc)
 :DIV125
         SET X, 0xCCCC
-        JMP MULRPT
+        JMP MULRPT      ; FAC <- ARG * 8/5
 
 ; reciprocal multiplier for 1/1.5 (3, 6, 12, etc)
 :DIV15
 		SET X, 0xAAAA
-		JMP MULRPT
+		JMP MULRPT      ; FAC <- ARG * 4/3
 ; optimized multiplier for repeating bytes
 ; accepts mantissa in X
 :MULRPT
@@ -461,8 +462,8 @@
 		SET A, [ARGHO+1]
 		IFN A, 0
 		   JMP MULRPT2 ; Multiply next word of ARG
-                SET Y, A
-                JMP MULRPT3 ; Add rounding bit and return.
+        SET Y, A
+        JMP MULRPT3 ; Add rounding bit and return.
 :MULRPT2        ; Multiply ARGHO+1 by same thing
 		MUL A, X
 		SET Y, EX
@@ -491,7 +492,6 @@
 :ROMBB12    IFE A, 0  ; dividing by 0?
                 JMP ROMBB8A ; oh shi--
             JSR ROUND
-            SET [COLOR], 0xE600
             SET A, 0
 			SUB A, [FACEXP]
             AND A, 0xFF
@@ -678,10 +678,9 @@
 :ROUND
 :ROMBC1B    IFE [FACEXP], 0
                 RTS
-            SHL [FACOV], 1
-            IFE EX, 0
-                RTS
-            ; increment mantissa
+            IFA [FACOV], -1
+                RTS 
+            ; high bit of FACOV is set, increment mantissa
 :ROMBC23    ADD [FACHO+1], 1
             ADX [FACHO], 0  
             IFE EX, 0
@@ -705,31 +704,31 @@
 :ROMBC39
         JSR SIGN
 
+:GIVAYF ;Convert 16-Bit Signed Integer to Floating Point
+:ROMB391    SET [VALTYP], 0   ; numeric
+            SET [FACHO], A
+            SET X, 0x90 ; FAC < 32768
+            JMP ROMBC44 ; normalize
+            
 ; Move signed 8-bit number from A into float
 
 :ROMBC3C
-        SHL A, 8
-        SET [FACHO], A ; Mantissa
-        SET [FACHO+1], 0
-        SET X, 0x88  ; needed for ROMBC49
-        SET [FACEXP], X
-:ROMBC44
-        SET A, [FACHO]
-        ; 6502 version set carry bit to opposite 
-        ; of high bit of FACHO.
-        ; used at BD02 to determine whether
-        ; to call NEGFAC.
-        SET EX, 0
-        IFU A, 0
-            SET EX, -1
+            SHL A, 8
+            SET [FACHO], A ; Mantissa
+            SET [FACHO+1], 0
+            SET X, 0x88      ; FAC < 128
+:ROMBC44 ; EX contains sign of number
+            SET EX, 0
+            IFU A, 0
+                SET EX, -1
 ; Zero out rest of FACHO
 :ROMBC49
-        SET A, 0
-        SET [FACEXP], X
-        SET [FACHO+1], A
-        SET [FACOV], A
-        SET [FACSGN], A
-        JMP ROMB8D2
+            SET A, 0
+            SET [FACEXP], X
+            SET [FACHO+1], A
+            SET [FACOV], A
+            SET [FACSGN], A
+            JMP ROMB8D2
             ;... does a NEGFAC if EX = -1,
             ; then normalizes the thing
 
