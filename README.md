@@ -58,12 +58,12 @@ mostly like they do on the C64:
   * Float variables like A
   * Integer variables like A%
 * Multi-dimensional arrays for all the above types
+* Garbage collection
 
 Just about anything else won't work, and may even crash the machine.
 Here's what's missing, in the rough order of when I'm going to add it:
 * other functions (MID$, VAL, PEEK, POS)
 * Program storage (LOAD, SAVE, VERIFY)
-* Garbage collection
 * File access (OPEN, CLOSE, GET, GET#, INPUT#, PRINT#, CMD)
 * Exponents and logarithms (EXP, LOG, ^ operator)
 * POKE and PEEK (I'll need to stabilize the memory map first)
