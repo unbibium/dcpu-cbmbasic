@@ -995,6 +995,7 @@
 ; output floating point number in FAC1
 :FOUT
 :ROMBDDD    SET Y, FLOATSTR
+:FOUT1
 :ROMBDDF    ;SET [FACOV], 0 ; TODO: cleanup
             SET A, 0x20    ; SPACE
             IFB [FACSGN], 0x8000
@@ -1154,13 +1155,6 @@
 ; for various rounding purposes.
 :FHALF
 :ROMBF11   DAT 0x80, 0x0000, 0x0000 
-
-; the NOTFNS routine points here when there's an array,
-; but there's nothing special there
-;  $00,$00,$00,$FA,$0A,$1F,$00
-; i'll put some random approximation of what's there there
-; and hope it pays off.
-:ROMBF13    DAT 0,0,0xFA0A,0x1F00
 
 ; divisors for decimal conversion
 :FOUTBL

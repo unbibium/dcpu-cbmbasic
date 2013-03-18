@@ -104,7 +104,7 @@
 ;temporary pointer to the current string descriptor
 :RAM50
 :DSCPNT DAT 0
-:FOUR6
+:DSCLEN
 :RAM53  DAT 0
 :RAM55  DAT 0
 ; Parameters for memory copying and manipulation
@@ -623,9 +623,9 @@
 ; MOVE BLOCK OF MEMORY UP
 ;
 ; ON ENTRY:
-;	(Y,A) = (HIGHDS) = DESTINATION END+1     (58)
-;	(LOWTR) = LOWEST ADDRESS OF SOURCE       (5F)
-;	(HIGHTR) = HIGHEST SOURCE ADDRESS+1      (5A)
+;   (Y,A) = (HIGHDS) = DESTINATION END+1     (58)
+;   (LOWTR) = LOWEST ADDRESS OF SOURCE       (5F)
+;   (HIGHTR) = HIGHEST SOURCE ADDRESS+1      (5A)
 ; ----------------------------------------------------------------------------
 ; Parameters in [LOWTR], [HIGHTR], and [HIGHDS]
 ;               and A should contain the value of [HIGHDS].
@@ -642,7 +642,7 @@
 :ROMA3BG        STD [I], [J]
                 IFN J, B
                     JMP ROMA3BG
-				SET [I], [J] ; last byte
+                SET [I], [J] ; last byte
                 RTS
 
 ; test for A bytes free on stack
@@ -1378,7 +1378,7 @@
             JMP STMT_GOTO ; THEN <line number>
 
 :STMT_ON
-:ROMA94B    JSR ROMB79E  ; Get result of expression after ON
+:ROMA94B    JSR GETBYT  ; Get result of expression after ON
             SET PUSH, A  ; cache token following the expression
             IFE A, BASIC_GOSUB_TOKEN
                 JMP ROMA957
@@ -1528,7 +1528,7 @@
             JMP ROMABB5
 
 :STMT_CMD
-:ROMAA86    JSR ROMB79E ; get byte
+:ROMAA86    JSR GETBYT
             IFE Z, 1  ; i think it ends in CHRGOT
                 JMP ROMAA90
             SET A, CBM_COLON
@@ -1645,10 +1645,6 @@
 ; print string from $22/$23 [INDEX]
 
 :ROMAB21    JSR ROMB6A6  ; get address in X, length in A
-            ; sanity check
-            ;SET EX, 0x4444
-            ;IFG A, 0x50   ; too long to be real
-            ;    JMP CRASH  ;debug
             SET X, A         ; length to X
             SET Y, [INDEX]   ; address to Y
             ADD X, 1
@@ -1711,7 +1707,7 @@
             RTS
 
 :STMT_INPUTN
-:ROMABA5    JSR ROMB79E ; get byte
+:ROMABA5    JSR GETBYT
             SET A, CBM_COMMA
             JSR SYNCHR
             SET [CHANNL], X
@@ -1808,7 +1804,7 @@
 :ROMAC72    SET [ENDCHR], A
             SET A, [RAM7A]
             ADD A, C
-            JSR ROMB48D ; STRLIT without quotes?
+            JSR STRLT2  ; STRLIT for unquoted string
             JSR ROMB7E2 ; move cursor to after string
             JSR ROMA9DA ; assign to a string variable
             JMP ROMAC91 ; handle any extra
@@ -2011,13 +2007,6 @@
             JMP FRM_PERFORM2 ; perform stacked operation
             ; will return to address at top of stack
 
-; notes
-; 6502
-;          adfe     AE07     AE09         ae0b
-;  3=3              a=82     C=0          a=4
-;  "A"="A"          a=71     C=1          a=5
-;  "A"=3            a=82     C=1 $0d=7f   a=5
-;  3="A"            71        C=0          a=4
 ; handle comparison operators
 ; the first instruction here was LSR $0D, which I think was there
 ; to both set VALTYP to "numeric" for all future BMI tests, while
@@ -2260,8 +2249,8 @@
 :ROMAF5D    IFC [INTFLG], 0x80 
                 JMP ROMAF6E
             SET A, [RAM64]  ; get pointer to integer
-			SET A, [A]      ; follow pointer
-	        JMP GIVAYF
+            SET A, [A]      ; follow pointer
+            JMP GIVAYF
 
 :ROMAF6E    JSR ROMAF14  ; check variable pointer range?
             IFE C, 0 ; Not found?
@@ -2294,7 +2283,7 @@
             SET X, POP
             SET PUSH, [RAM64]
             SET PUSH, X
-            JSR ROMB79E  ; get small integer
+            JSR GETBYT  ; get small integer
             SET Y, POP
             SET A, X
             SET PUSH, A
@@ -2431,7 +2420,7 @@
             JSR ISALPHA
             IFE C, 0
                 JMP SNERR
-        	SET X, 0
+            SET X, 0
 :ROMB09F    SET [VALTYP], 0  ; numeric
             SET [INTFLG], 0
             JSR CHRGET
@@ -2567,6 +2556,7 @@
         ; to a positive integer
 :ROMB1B2    JSR CHRGET
 :ROMB1B5    JSR FRMEVAL
+:MKINT
 :ROMB1B8    JSR CHKNUM  ; check that term is numeric
             IFG [FACSGN], 0x7F  ; check that it is positive
                 JMP FCERR
@@ -2731,6 +2721,7 @@
 ; [LOWTR+3] POINTS AT # OF DIMS IN ARRAY DESCRIPTOR
 ; THE SUBSCRIPTS ARE ALL ON THE STACK AS INTEGERS
 ; HIGHDS must have been set by GETARY.
+; todo: try replacing RAM71 references with a register
 :FIND_ARRAY_ELEMENT
 :ROMB2EA    SET Y, [LOWTR]
             ADD Y, 3
@@ -2766,7 +2757,7 @@
 ; currently doesn't really work due to garbage collection
 :ROMB37D    IFN [VALTYP], 0
                 JSR ROMB6A6  
-            ;JSR GARBAG
+            JSR GARBAG
             SET A, [RAM33]
             SUB A, [STREND]
             JSR GIVAYF
@@ -2806,14 +2797,14 @@
 :STRD
 :ROMB465    JSR CHKNUM ; arg must be numeric
             SET Y, FLOATSTR-1
-            JSR ROMBDDF   ; FOUT+1
+            JSR FOUT1   ; FOUT+1
             SET A, POP  ; originally 2x PLA
 :ROMB46F    SET A, FLOATSTR-1
             JMP STRLIT
             
             ; create pointers to the string
 :ROMB475    SET [DSCPNT], [RAM64]
-
+:STRSPA
 :ROMB47D    JSR GETSPA    ; Allocate Memory in A
             SET [RAM62], X  ; string address 
             SET [RAM61], A  ; string length
@@ -2836,6 +2827,7 @@
             SET [CHARAC], X
             SET [ENDCHR], X
 ; enter here if CHARAC and ENDCHR aren't quotes
+:STRLT2
 :ROMB48D    SET [RAM6F], A   ; String pointer
             SET [RAM62], A   ; String beginning pointer
             ; LOOP to...???
@@ -2843,8 +2835,6 @@
             SUB I, 1
 
 :ROMB497    ADD I, 1
-            ;IFG [ARYTAB], [VARTAB]
-            ;   JMP STRDEBUG
 :ROMB498    SET A, [I]         ; get character
             IFE A, 0
                 JMP ROMB4A8
@@ -2868,9 +2858,9 @@
 :ROMB4B7    IFE [RAM6F], 0   ; test for whatever happens below B4D5.
                 JMP ROMB4BF  ; it makes the memory copy unconditional
             IFG A, RAM0200+BASIC_BUFFER_LENGTH ; not immediate mode
-                JMP ROMB4CA  ; skip memory copy 
+                JMP PUTNEW  ; skip memory copy 
             IFU A, RAM0200
-                JMP ROMB4CA  ; skip memory copy
+                JMP PUTNEW  ; skip memory copy
             ; if it's in the temporary string area,
             ; it needs to be moved into memory
 :ROMB4BF    ; Y should have a string length now
@@ -2878,15 +2868,19 @@
             SET A, Y        ; send A as length
             JSR ROMB475     ; send destination in [FRESPC]
             SET X, [RAM6F]  ; send source as X
-            JSR ROMB688     ; move string to [FRESPC]
-; save descriptor from $61-$63 on stack
+            JSR MOVSTR     ; move string to [FRESPC]
+; ----------------------------------------------------------------------------
+; STORE DESCRIPTOR IN TEMPORARY DESCRIPTOR STACK
+;
+; THE DESCRIPTOR IS NOW IN FAC, FAC+1
+; PUT ADDRESS OF TEMP DESCRIPTOR IN FAC+2,3
+; ----------------------------------------------------------------------------
+:PUTNEW
 :ROMB4CA    IFU [TEMPPT], TEMPSTEND 
                 JMP ROMB4D5 
             ; if no room on stack
 :ROMB4D0    SET X, 0x19 ; ?FORMULA TOO COMPLEX
             JMP ERROR
-            SET EX, 3
-            ;JMP ERROR
 :ROMB4D5    SET I, [TEMPPT] ; current pointer location
             SET [I], [RAM61]    ; Length
             SET [I+1], [RAM62]  ; Pointer
@@ -2908,7 +2902,16 @@
             SET B, [RAM7A]
             DAT 0x3400
             RTS
-;
+
+
+; debugging routine for garbage collector
+.MACRO GARBDEBUG(F)
+            ;SET C, [GARBDISPLAY] 
+            ;SET [C], 0x7000+F
+            ;ADD [GARBDISPLAY], 1 
+.ENDMACRO
+:GARBDISPLAY  DAT SCREENMEM+64
+
 ; allocate number of bytes in A
 ; The amount of space needed for a string is 
 ; passed to this routine, and the routine checks 
@@ -2917,29 +2920,24 @@
 ; tries again.
 ; Returns original length requested in A
 ; Returns address in X (originally XY)
-; array ptr
-.DEFINE GARB_LG 7
-; single string ptr
-.DEFINE GARB_SM 3
-; due to the 6502's zero-page advantage, these
-; bytes were all cached in the original version.
-; here, we just allocate more memory
-:GAR57 DAT 0
-:GAR58 DAT 0
-:GAR59 DAT 0
-:GAR5A DAT 0
-:GAR5B DAT 0
-:GAR5C DAT 0
-:GAR5D DAT 0
-:GAR5E DAT 0
-:GAR5F DAT 0
-; get space at end of memory
-; parameter: number of words required in A
-; returns pointer in X
+; Single string ptr -- includes variable name and extra byte.
+.DEFINE GARB_LG 5
+; Array pointer -- contains only length and address
+.DEFINE GARB_SM 2
+; The first time through, I was under the impression that
+; the C64 version cached a lot of zero-page memory, but I
+; can't seem to find the code that did that.  So I'll just
+; re-use the variables in the same way, which is probably
+; important since they serve as parameters to BLTU.
+; ----------------------------------------------------------------------------
+; MAKE SPACE FOR STRING AT BOTTOM OF STRING SPACE
+; (A)=# BYTES SPACE TO MAKE
+;
+; RETURN WITH (A) SAME,
+;   AND Y,X = ADDRESS OF SPACE ALLOCATED
+; ----------------------------------------------------------------------------
 :GETSPA
-:ROMB4F4    ;SET EX, [GARBFL]
-            SHR [GARBFL], 1
-            ;SET C, EX  ;???
+:ROMB4F4    SHR [GARBFL], 1
 :ROMB4F6    ;WARNING: potential for off-by-one error here
             SET X, [FREETOP] ; pointer to end of free RAM
             SUB X, A         ; subtract length of string
@@ -2949,134 +2947,131 @@
             SET [FRESPC], X ; temporary space for strings
             ; A still contains the length 
             RTS
-            
-:ROMB516    DAT 0x6C00   ; don't know how to GC yet
-            SET X, 0x10
-            SET B, [GARBFL]
-            IFG B, 0x7f
+:L3311            
+:ROMB516    SET X, 0x10    ; ?OUT OF MEMORY ERROR
+            IFG [GARBFL], 0x7f
                 JSR GARBAG
             SET [GARBFL], 0x80
-            SET A, POP
-            IFN A, 0 ; why would it ever be 0?
-                JMP ROMB4F6
+            JMP ROMB4F6
+; ----------------------------------------------------------------------------
+; SHOVE ALL REFERENCED STRINGS AS HIGH AS POSSIBLE
+; IN MEMORY (AGAINST HIMEM), FREEING UP SPACE
+; BELOW STRING AREA DOWN TO STREND.
+; ----------------------------------------------------------------------------
 :GARBAG
-:ROMB526    SET A, [MEMSIZ]
-:ROMB52A    SET [FREETOP], A
+:ROMB526    SET I, [MEMSIZ]
+:FINDHIGHESTSTRING
+:ROMB52A    SET [FREETOP], I
             SET [DEFPNT], 0
-            SET [GAR5F], [STREND]
-            SET 0x1234, 0x5678
-:ROMB53C    SET A, TEMPST   ; ???
-:ROMB540    SET [INDEX], A  ; 
-:ROMB544    IFE A, [TEMPPT]
+; LOWTR will be set to the highest string variable that is
+; actually referenced somewhere in the program.
+            SET [LOWTR], [STREND]
+; check all temporary string pointers
+            SET I, TEMPST   ; pointer to string stack
+:ROMB544    IFE I, [TEMPPT]
                 JMP ROMB54D
-            JSR ROMB5C7
-            IFE Z, 1
-                JMP ROMB544
-:ROMB54D    SET [FOUR6], GARB_LG  ; number of bytes
-            SET A, [VARTAB]
-            SET [INDEX], A
-:ROMB559    IFE [ARYTAB], A
+            JSR CHECK_VARIABLE
+            JMP ROMB544 ; compare next I
+; check all scalar string pointers
+:ROMB54D    SET [DSCLEN], GARB_LG  ; bytes per variable
+            GARBDEBUG(0x32)
+            SET I, [VARTAB]
+:ROMB559    IFE [ARYTAB], I
                 JMP ROMB566
-:ROMB561    JSR ROMB5BD
-            IFE Z, 1
-                JMP ROMB559 ; compare AX again
-:ROMB566    SET [GAR58], A
-            SET [FOUR6], GARB_SM ; number of bytes
-:ROMB56E    SET A, [GAR58]
-:ROMB572    IFE [STREND], A
-                JMP ROMB57D
-            JMP ROMB606
-:ROMB57D    SET [INDEX], A
-:ROMB581    SET I, [INDEX]
-:ROMB583    SET X, [I]
-:ROMB586    ADD I, 1
-            SET B, [I]  ; originally pushed 
-:ROMB58A    ADD I, 1    ; one fewer than in 8-bit version
-:ROMB58B    ADD [GAR58], [I] ;
-:ROMB591    ; high byte skipped
-            IFL B, 0x80      ; PLP
-                JMP ROMB56E  ; BPL ROMB56E
-            IFG X, 0x7F      ; TXA
-                JMP ROMB56E
-:ROMB59E    ADD I, 1
-            SET A, [I]
-            SET Y, 0
-:ROMB5A3    SHL A, 1  ; really need to multiply by 2?
-:ROMB5A4    ADD A, 5
-:ROMB5A6    ADD [INDEX], A
-            SET A, [INDEX]
-:ROMB5B0    IFE A, [GAR58]
-                JMP ROMB572
-:ROMB5B8    JSR ROMB5C7
-            IFE Z, 1    ; Zero bit set
-                JMP ROMB5B0
+            JSR CHECK_SIMPLE_VARIABLE
+            JMP ROMB559 ; compare next I
+; check all array string pointers
+:ROMB566    SET [HIGHDS], I
+            GARBDEBUG(0x33)
+            SET [DSCLEN], GARB_SM ; number of bytes
+:ROMB56E    SET I, [HIGHDS]
+:ROMB572    IFE [STREND], I
+                JMP MOVE_HIGHEST_STRING_TO_TOP
+:ROMB57D    SET [INDEX], I ; probably just need to cache
+:ROMB581    ADD [HIGHDS], [I+2] ; add array size in bytes
+            ; HIGHDS now points to next array
+            IFC [I], 0x80
+                JMP ROMB56E   ; Not a string, go to next array
+            IFB [I+1], 0x80
+                JMP ROMB56E   ; Not a string, go to next array
+            ; get string array
+            ADD I, 3   ; I now points to number of dimensions
+            ADD I, [I] ; Add number of dimensions
+            ;Loop through all string pointers here.
+:ROMB5B0    IFE I, [HIGHDS] ; reached end of array?
+                JMP ROMB572 ; go to next array
+:ROMB5B8    JSR CHECK_VARIABLE
+            JMP ROMB5B0
                 
-; CHECK STRING AREA
-; I.E. Check for most eligible string to collect
-:ROMB5BD    SET Z, 0
-            SET I, [INDEX]
-            IFG [I], 0x7F ; BMI
-                JMP ROMB5F6
-            ADD I, 1
-            IFL [I], 0x80 ; BPL
-                JMP ROMB5F6
-            ADD I, 1
-            
-; This takes A as a parameter?
-; This needs to return A and Z
-:ROMB5C7    SET Z, 0
-            IFE [I], 0
-                JMP ROMB5F6
-            ADD I, 1
-            SET A, [I]   ; one fewer byte than 8-bit ver
-            IFL A, [FREETOP]
-                JMP ROMB5DC
-            JMP ROMB5F6
-:ROMB5DC    IFL A, [LOWTR]
-                JMP ROMB5F6
-            IFN A, [LOWTR]
-                JMP ROMB5E6
-            JMP ROMB5F6
-:ROMB5E6    SET [LOWTR], A
-            SET A, [INDEX]
-            SET [DEFPNT], A
-            SET [RAM55], [FOUR6]
-:ROMB5F6    SET A, [INDEX] ; we do this on A because
-            ADD A, [FOUR6] ; it's going to be the
-            SET [INDEX], A ; return value.
-            SET Y, 0
-            SET Z, 1
-            RTS
-
-            ; SOME MISSING
-; CONTINUATION OF GARBAGE CLEAN UP
-
-:ROMB601    SET A, [INDEX]  ; Why just the high bit?
-            SET Y, 0
-            SET Z, 1
-            RTS
-            ; COLLECT A STRING
-:ROMB606    IFE [DEFPNT], 0
-                JMP ROMB601
-            SET Y, [RAM55]
-            AND Y, 4     ; ???
-            SHR Y, 1     ; ???
-            SET [RAM55], Y
-            SET I, [DEFPNT] ; ($4E),Y
-            ADD I, Y
+; ----------------------------------------------------------------------------
+; PROCESS A SIMPLE VARIABLE
+; ----------------------------------------------------------------------------
+:CHECK_SIMPLE_VARIABLE
+:ROMB5BD    GARBDEBUG(0x13)
             SET A, [I]
-            ADD A, [LOWTR]
+            SET B, [I+1]
+            ; check type bits in the name.
+            IFB [I], 0x80  
+                JMP CHECK_BUMP ; not a string; skip.
+            IFC [I+1], 0x80 
+                JMP CHECK_BUMP ; not a string, skip.
+            SET Y, I
+            ADD Y, 2 ; set Y to pointer after name.
+            IFE Y, 0 ; skip default Y in next instruction
+; ----------------------------------------------------------------------------
+; IF STRING IS NOT EMPTY, CHECK IF IT IS HIGHEST
+; ----------------------------------------------------------------------------
+; pass address of string desriptor in I? 
+; This needs to return I
+:CHECK_VARIABLE
+:ROMB5C7    SET Y, I
+            GARBDEBUG(0x16)
+            IFE [Y], 0   ; If zero length
+                JMP CHECK_BUMP ; skip
+            GARBDEBUG(0x01)
+            SET A, [Y+1]   ; Get pointer to string data
+            IFL A, [FREETOP]  ; if it's in the area being searched
+                JMP ROMB5DC   ; then proceed
+            JMP CHECK_BUMP    ; otherwise skip; it's already sorted
+:ROMB5DC    GARBDEBUG(0x02)  ; check b
+            IFG A, [LOWTR]
+                JMP ROMB5E6
+            JMP CHECK_BUMP
+:ROMB5E6    GARBDEBUG(0x03)  ; check c
+            SET [LOWTR], A
+            SET [DEFPNT], I
+            SET [RAM55], [DSCLEN]
+; ----------------------------------------------------------------------------
+; ADD (DSCLEN) TO PNTR IN I
+; ----------------------------------------------------------------------------
+:CHECK_BUMP
+:ROMB5F6    ADD I, [DSCLEN]
+:ROMB601    RTS
+
+; ----------------------------------------------------------------------------
+; FOUND HIGHEST NON-EMPTY STRING, SO MOVE IT
+; TO TOP AND GO BACK FOR ANOTHER
+; ----------------------------------------------------------------------------
+:MOVE_HIGHEST_STRING_TO_TOP
+:ROMB606    GARBDEBUG(0x0D) ; M for MOVE
+            ; defpnt isn't getting set 
+            IFE [DEFPNT], 0
+                JMP ROMB601
+            GARBDEBUG(0x21) ; ! for actually happening
+            SET Y, [RAM55]  ; a cached DSCLEN
+            SET I, [DEFPNT] ; contains the address of a descriptor
+            IFE Y, GARB_LG  ; is a scalar
+                ADD I, 2    ; point past the name
+            SET [RAM55], I  ; hide link
+            SET A, [I]      ; get length of string
+            ADD A, [LOWTR]  ; index past LOWTR that far
             SET [HIGHTR], A         ; Source end + 1
             SET [HIGHDS], [FREETOP] ; Destination end + 1
-:ROMB628    JSR BLTU2 ; copy memory
-:ROMB62B    SET Y, [RAM55]
-            ADD Y, 1
-            SET I, [DEFPNT]
-            ADD I, Y
-            SET [I], [HIGHDS] ; Points to end of destination
-            ; A should contain something
-            ; suitable to be stored in [FREETOP] ($33)
-            JMP ROMB52A
+            JSR BLTU2 ; copy memory, get next FREETOP in I.
+            SET X, [RAM55]  ; recover index
+            ADD X, 1        ; point to address
+            SET [X], I      ; first byte of destimation
+            JMP FINDHIGHESTSTRING
 
 ; JOINING STRINGS
 :CAT
@@ -3097,10 +3092,10 @@
             JSR MOVINS  ; move string in [RAM6F] to temporary string
             SET A, [DSCPNT]
             JSR FRETMP ; set [INDEX] to [DSCPNT] then de-allocate 
-            JSR ROMB68C ; copy that too.
+            JSR MOVSTR1 ; copy that too.
             SET A, [RAM6F]
             JSR FRETMP ; set [INDEX] to [RAM6F] then de-allocate
-            JSR ROMB4CA ; save descriptor on stack
+            JSR PUTNEW ; save descriptor on stack
             JMP ROMADB8
 
 ; move string
@@ -3112,12 +3107,13 @@
             SET X, [Y+1]
 
 ; move string with length A, pointer in XY
-; starting from the end
-; if you jump to ROMB68C, [INDEX] should already be set
-
+; starting from the end of FRESPC.
+; if you jump to MOVSTR1, [INDEX] should already be set
+:MOVSTR
 :ROMB688    SET [INDEX], X
+:MOVSTR1
 :ROMB68C    SET I, [INDEX]  ; source
-:ROMB68D    IFE A, 0   ; zero length
+            IFE A, 0   ; zero length
                 JMP ROMB699 ; do nothing
             ADD I, A        ; source
             SET J, [FRESPC] ; destination
@@ -3174,15 +3170,15 @@
             SET Y, 0
             RTS
 :CHRD
-:ROMB6EC    JSR ROMB7A1  ; get byte operand
+:ROMB6EC    JSR CONINT  ; get byte operand
             SET PUSH, X  ; push byte result
             SET A, 1
-            JSR ROMB47D   ; create a string 
+            JSR STRSPA   ; create a string 
             SET A, POP
             SET Y, [FACHO]
             SET [Y], A
             SET A, POP
-            JMP ROMB4CA ; save descriptor in $61 on stack
+            JMP PUTNEW ; save descriptor in $61 on stack
 :LEFTD
 :ROMB700    JSR PREAM
             SET X, 0
@@ -3193,15 +3189,16 @@
 :ROMB70C    SET PUSH, A
             SET PUSH, X
             SET PUSH, Y
-:ROMB70F    JSR ROMB47D   ; allocate number of bytes in A
+:ROMB70F    JSR STRSPA   ; allocate number of bytes in A
             SET A, [DSCPNT] ; get address
             JSR FRETMP   ; Allocate string memory
-            SET Y, POP  ; pop address
+            SET Y, POP  ; pop address of descriptor
             SET X, POP  ; pop starting index
             ADD [INDEX], X
             SET A, POP  ; pop length
-            JSR ROMB68C ; move string with length A
-:ROMB729    JMP ROMB4CA
+            ;JMP CRASH
+            JSR MOVSTR1 ; move string with length A
+:ROMB729    JMP PUTNEW
 :RIGHTD
 :ROMB72D    JSR PREAM ; get parameters
             ; set starting index to string length
@@ -3210,28 +3207,31 @@
             SUB X, A
             JMP ROMB706
 :MIDD
-:ROMB737    SET [RAM64], -1
+:ROMB737    SET [RAM64], -1 ; default: get all bytes
             JSR CHRGOT
             IFE A, 0x29 ; clos paren
                 JMP ROMB748 ; default to end-of-string
             JSR CHKCOM
-            JSR ROMB79E  ; GETBYTC
+            JSR GETBYT ; length to extract in [RAM64]
 :ROMB748    JSR PREAM ; get first two parameters
-            IFE A, 0
-            JMP ROMB248
+            IFE A, 0  ; zero index requested
+                JMP ROMB248 ; illegal quantity error
             SUB A, 1
-        SET PUSH, A ; Push line length 
-        IFG A, [Y] 
-            JMP ROMB70D ; push X and continue
-            XOR A, -1
-        IFG A, [RAM64]
-            SET A, [RAM64]
+            SET PUSH, A ; Push start index
+            SET X, A
+            SUB X, [Y]
+            IFE EX, 0
+                JMP ROMB70D 
+            XOR X, -1
+            IFU X, [RAM64]
+                SET X, [RAM64]
 :ROMB75F    JMP ROMB70E
 
 ; special cases for MID$
-:ROMB70D    SET PUSH, PEEK
+:ROMB70D    SET PUSH, A
             IFE 1, 0
-:ROMB70E    SET PUSH, A
+:ROMB70E    SET PUSH, X
+            SET PUSH, Y
             JMP ROMB70F
 
 :ROMB39E    SET C, 1
@@ -3252,9 +3252,14 @@
             JMP X
 
 ; LEN function 
-:ROMB77C    JSR ROMB782
+:ROMB77C    JSR GETSTR
             JMP GIVAYF
-            
+
+; ----------------------------------------------------------------------------
+; IF LAST RESULT IS A TEMPORARY STRING, FREE IT
+; MAKE VALTYP NUMERIC, RETURN LENGTH IN Y-REG
+; ----------------------------------------------------------------------------
+:GETSTR
 :ROMB782    JSR FRESTR  ; get length in A
             SET [VALTYP], 0 ; returning a number
             SET Y, A     
@@ -3262,7 +3267,7 @@
 
 ; ASC function
 :ASCN
-:ROMB78B    JSR ROMB782
+:ROMB78B    JSR GETSTR
             IFE A, 0
                 JMP ROMB248
             SET Y, [INDEX]
@@ -3272,13 +3277,15 @@
 ; get an integer that fits into a byte
 :GETBYTC
 :ROMB79B    JSR CHRGET
+:GETBYT
 :ROMB79E    JSR FRMNUM  ; get formula in FAC
-:ROMB7A1    JSR ROMB1B8 ; convert to integer
+:CONINT     ; Convert FAC to integer and return as X
+:ROMB7A1    JSR MKINT ; convert to integer
             SET X, [RAM64]
             JMP CHRGOT
 
 :VAL
-:ROMB7AD    JSR ROMB782
+:ROMB7AD    JSR GETSTR
             IFE A, 0
                 JMP ROMB7B5
             JMP ROMB8F7 ; zero FACEXP and FACSGN
@@ -3302,7 +3309,7 @@
 :ROMB7EB    JSR FRMNUM  ; get an int
             JSR GETADR ; convert to integer
             JSR CHKCOM ; check for comma
-            JMP ROMB79E ; get a byte value
+            JMP GETBYT ; get a byte value
 
 ; convert float to integer
 
@@ -3341,7 +3348,7 @@
             SET [RAM05], GIVAYF
             SET [RAM03], ROMB1AA
             ; skipped code that copies CHRGET/CHRGOT
-            SET [FOUR6], 2  ; single string descriptor
+            SET [DSCLEN], 2  ; single string descriptor
             SET [BITS], 0
             SET [CHANNL], 0
             SET [LASTPT], 0
