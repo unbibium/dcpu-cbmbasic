@@ -9,12 +9,17 @@
 ; also TODO: optimize some of these routines so that
 ; they use registers instead of memory.
 ;
-:RAM57  DAT 0, 0, 0
-:RAM5C  DAT 0, 0, 0
+; dependencies in basic.dasm16:
+;    ERROR
+;    FCERR
+;
 :RAM5D 
 :DECEXP DAT 0 ; decimal exponent during FIN/FOUT
 :RAM5E  DAT 0 ; Number of digits during FIN?
 :RAM60  DAT 0 ; sign of exponent operator in FIN
+;
+; Floating Point Accumulators
+; 
 :FAC1    ; Floating Point Accumulato0r 
 :RAM61   ; Exponent (only 8 bits used)
 :FACEXP DAT 0
@@ -24,12 +29,8 @@
 :FACSGN
 :RAM66 DAT 0
 
-:RAM67 
-:SERLEN         ; Number of terms in a series evaluation
-:SGNFLG  DAT 0  ; OR, a sign flag somewhere in FIN.
-
-:RAM68 ; FAC 1 Overflow during conversions
-:BITS   DAT 0
+:RAM68 ; FAC Overflow during conversions
+:BITS    DAT 0
 
 :FAC2
 :ARG     ; Floating Point Argument
@@ -46,15 +47,30 @@
 :RAM6F  DAT 0
 :FACOV  ;low order mantissa byte for rounding
 :RAM70  DAT 0
-:RESHO ; multiplication argument - mantissa only
+;
+; Multiplication result - denormalized.
+:RESHO 
 :RAM26  DAT 0
 :RAM27  DAT 0, 0
+
+:RAM67 
+:SERLEN         ; Number of terms in a series evaluation
+:SGNFLG  DAT 0  ; OR, a sign flag somewhere in FIN.
+
+; Temporary registers
+:FACTEMP1
+:RAM57  DAT 0, 0, 0
+:FACTEMP2
+:RAM5C  DAT 0, 0, 0
+:FACTEMP3
+:RAM4E  DAT 0, 0, 0
+
 :RNDX   ; random number seed
-		DAT 0x80, 0x4FC7, 0x5258
+        DAT 0x80, 0x4FC7, 0x5258
 
 :FADDH
 :ROMB849
-            SET A, FHALF
+            SET A, CON_HALF
             JMP FADD
             
 :FSUB
@@ -84,8 +100,8 @@
                         ; store to ARG.
 :FADDT  ; Add FAC and ARG.  (load FACEXP in A first)
 :ROMB86A    ; A = FACEXP
-            IFE A, 0  ; 0 + ARG = ARG
-                JMP MOVFA ; so return ARG.
+            IFE A, 0       ; 0 + ARG = ARG
+                JMP MOVFA  ; so return ARG.
             SET [ARGOV], [FACOV]  ;ARGOV?
             SET X, ARGEXP ;  pointer
             SET A, [ARGEXP]    ; A = actual exponent
@@ -93,15 +109,15 @@
             IFE Y, 0 ; FAC + O = FAC
                 RTS  ; so return FAC
 :ROMB87B    SUB A, [FACEXP]  ; A = ARGEXP - FACEXP
-            IFE A, 0  ; equal exponents
+            IFE A, 0         ; equal exponents
                 JMP ROMB8A3
-            IFE EX, -1   ; subtraction underflow
+            IFE EX, -1       ; subtraction underflow
                 JMP ROMB893
 :ROMB881    SET [FACEXP], Y ; Store larger exponent
             SET [FACSGN], [ARGSGN] 
             SET [BITS], 0  ; had to add this for some rsn
-            XOR A, 0xFFFF ; 
-            ADD A, 1   ; ADC #$00 after a subtract
+            XOR A, 0xFFFF
+            ADD A, 1       ; ADC #$00 after a subtract
             SET [ARGOV], 0
             SET X, FACEXP ; a pointer to larger exponent
             JMP ROMB897
@@ -139,7 +155,7 @@
             SET [FACHO], A
             ; BCS B8D7, then JSR NEGFAC
 :ROMB8D2    ;IFN [ARYTAB], [VARTAB]
-            ;	JMP FACCRASH
+            ;    JMP FACCRASH
             IFE EX, -1 ; one borrow left to do
                 JSR NEGFAC
 :ROMB8D7    SET Y, 0
@@ -185,7 +201,7 @@
             BOR [FACHO+1], EX
 :ROMB929    IFC [FACHO], 0x8000   
                 JMP ROMB91D
-        	; mantissa is normalized
+            ; mantissa is normalized
 :ROMB92B    SUB A, [FACEXP]
             AND A, 0xFF
 :ROMB92E    IFE EX, 0 ; no borrow involved
@@ -195,7 +211,7 @@
             AND A, 0xFF
 :ROMB934    SET [FACEXP], A
 :ROMB936    
-			IFC A, 0xFF00 ; this BCC is probably unconditional
+            IFC A, 0xFF00 ; this BCC is probably unconditional
                 RTS
     ; Add 1 to exponent, and 
     ; shift manitssa to the right by 1.
@@ -231,9 +247,6 @@
 
 :OVERR ; Print overflow error message
 :ROMB97E
-            ; crash instead for debugging
-            ;SET A,0x897E
-            ;JMP FACCRASH
             SET X, 0x0F
             JMP ERROR
 
@@ -293,30 +306,57 @@
             RTS  ; A contains 0x00 through 0xFF00
                     ; as fetched from FACOV?
 
+
+
+
                     
 ; FP constant ONE
 ; default STEP for FOR statement
 :FONE
 :ROMB9BC  DAT 0x81, 0, 0
 
-; FP constants for LOG
-:LOGCN2
-:ROMB9C1 DAT 0x03   ; degree 4
-:ROMB9C2  DAT 0x7F,0x5E56,0xCB79
-:ROMB9C7  DAT 0x80,0x139B,0x0B64
-:ROMB9CC  DAT 0x80,0x7638,0x9316
-:ROMB9D1  DAT 0x82,0x38AA,0x3B20
+:POLY_LOG
+          DAT 0x03   ; degree 4
+          DAT 0x7F,0x5E56,0xCB79
+          DAT 0x80,0x139B,0x0B64
+          DAT 0x80,0x7638,0x9316
+          DAT 0x82,0x38AA,0x3B20
 
+
+:CON_SQR_HALF
 :ROMB9D6  DAT 0x80,0x3504,0xF334   ; 0,5 * SQR(2)
+:CON_SQR_TWO
 :ROMB9DB  DAT 0x81,0x3504,0xF334   ; SQR(2)
+:CON_NEG_HALF
 :ROMB9E0  DAT 0x80,0x8000,0x0000   ; -1/2
+:CON_LOG_TWO
 :ROMB9E5  DAT 0x80,0x3172,0x17F8   ; LOG(2)
-
 
 
 ; FAC1 <- ln FAC1
 :LOG
-:ROMB9EA    DAT 0x4100
+        JSR SIGN
+        IFE A, 0   ;can't LOG(0)
+            JMP FCERR
+        SET A, [FACEXP]
+        SUB A, 0x7F
+        SET PUSH, A
+        SET [FACEXP], 0x80
+        SET A, CON_SQR_HALF
+        JSR FADD
+        SET A, CON_SQR_TWO
+        JSR FDIV
+        SET A, FONE
+        JSR FSUB
+        SET A, POLY_LOG
+        JSR POLYNOMIAL_ODD
+        SET A, CON_NEG_HALF
+        JSR FADD
+        SET A, POP
+        JSR FINLOG
+        SET A, CON_LOG_TWO
+        ; fall through to FMULT
+
 
 ; FAC1 <- FAC1 * FAC2
 :FMULT
@@ -394,8 +434,8 @@
             ; put comparison result into ARISGN
 :ROMBACF    SET [FACSGN], [ARISGN]
 :ROMBAD3    RTS
-:ROMB8FB	SET [FACSGN], A
-			RTS
+:ROMB8FB    SET [FACSGN], A
+            RTS
 ; if FAC is positive, give OVERR
 ; if FAC is negative, set FAC=0, pop one return,
 ; and RTS.  called from EXP function
@@ -444,46 +484,48 @@
 
 ; reciprocal multiplier for 1/1.5 (3, 6, 12, etc)
 :DIV15
-		SET X, 0xAAAA
-		JMP MULRPT      ; FAC <- ARG * 4/3
+        SET X, 0xAAAA
+        JMP MULRPT      ; FAC <- ARG * 4/3
 ; optimized multiplier for repeating bytes
 ; accepts mantissa in X
 :MULRPT
-		SET A, [ARGHO]
-		MUL A, X
-		SET Y, EX
-		SET [FACHO], Y
-		ADD Y, A  ; carry bit one place to the right
-		SET A, EX
-		ADD [FACHO], A
-		ADD Y, A ; carry bit to the infinite-right
-		SET [FACHO+1], Y
-		SET [FACOV], Y
-		SET A, [ARGHO+1]
-		IFN A, 0
-		   JMP MULRPT2 ; Multiply next word of ARG
+        SET A, [ARGHO]
+        MUL A, X
+        SET Y, EX
+        SET [FACHO], Y
+        ADD Y, A  ; carry bit one place to the right
+        SET A, EX
+        ADD [FACHO], A
+        ADD Y, A ; carry bit to the infinite-right
+        SET [FACHO+1], Y
+        SET [FACOV], Y
+        SET A, [ARGHO+1]
+        IFN A, 0
+           JMP MULRPT2 ; Multiply next word of ARG
         SET Y, A
         JMP MULRPT3 ; Add rounding bit and return.
 :MULRPT2        ; Multiply ARGHO+1 by same thing
-		MUL A, X
-		SET Y, EX
-		ADD [FACHO+1], Y
-		ADX [FACHO], 0
-		ADD Y, A ; carry bit one place to the right
-		SET A, EX
-		ADD [FACHO+1], A
-		ADX [FACHO], 0
-		ADD Y, A ; carry bit to the infinite-right
+        MUL A, X
+        SET Y, EX
+        ADD [FACHO+1], Y
+        ADX [FACHO], 0
+        ADD Y, A ; carry bit one place to the right
+        SET A, EX
+        ADD [FACHO+1], A
+        ADX [FACHO], 0
+        ADD Y, A ; carry bit to the infinite-right
 :MULRPT3        ; Add rounding bit
-		SET EX, 1
-		ADX [FACOV], Y
-		ADX [FACHO+1], 0
-		ADX [FACHO], 0
-		JMP ROMB8D7 ; normalize
+        SET EX, 1
+        ADX [FACOV], Y
+        ADX [FACHO+1], 0
+        ADX [FACHO], 0
+        JMP ROMB8D7 ; normalize
 
-:ROMBB07	SET [ARISGN], 0
-			JSR MOVFM
-			JMP FDIVT
+; FAC <- FAC / ARG
+:DIV
+:ROMBB07    SET [ARISGN], 0
+            JSR MOVFM
+            JMP FDIVT
 
 ; FAC <- ARG / FAC
 :FDIV
@@ -493,7 +535,7 @@
                 JMP ROMBB8A ; oh shi--
             JSR ROUND
             SET A, 0
-			SUB A, [FACEXP]
+            SUB A, [FACEXP]
             AND A, 0xFF
             SET [FACEXP], A
             JSR MULDIV ; add exponents
@@ -506,11 +548,11 @@
             SET Y, [ARGHO]
             ; if dividend and divisor have same mantissa,
             ; set result's mantissa to 1.0 and return
-			IFE X, Y
+            IFE X, Y
                 IFE [FACHO+1], [ARGHO+1]
                     JMP MOV1HO
             IFN [FACHO+1], 0 ; no chance of reciprocal shortcut
-            	JMP FDIVFULL
+                JMP FDIVFULL
             ; m=0; copy mantissa
             IFE X, 0x8000
                 IFE [FACHO+1], 0
@@ -518,10 +560,10 @@
             ; Reciprocal dividers disabled; they're not
             ; accurate enough for fizzbuzz (though they're
             ; still used for decimal rendering)
-			; multiply by reciprocal for m=1.25 (5, 10, 20)
+            ; multiply by reciprocal for m=1.25 (5, 10, 20)
             IFE X, 0xA000
                 JMP DIV125
-			;; multiply by reciprocal for m=1.5 (3, 6, 12)
+            ;; multiply by reciprocal for m=1.5 (3, 6, 12)
             IFE X, 0xC000
                 JMP DIV15
             ; all others, do a 16-bit integer divide.  This
@@ -529,19 +571,19 @@
             ; we can squeak out a few more bits of accuracy
             ; on a small divisor by denormalizing it.
 :FDIVFULL
-			SET [FACOV], 0
-			ADD [FACEXP], 15
-			IFB X, 0x00FF ; Top 8 bits clear
-			    JMP FDIVDEN1
-			SHR X, 8
-			SUB [FACEXP], 8
+            SET [FACOV], 0
+            ADD [FACEXP], 15
+            IFB X, 0x00FF ; Top 8 bits clear
+                JMP FDIVDEN1
+            SHR X, 8
+            SUB [FACEXP], 8
 :FDIVDEN1
-			IFB X, 1 ; Top bit clear
-				JMP FDIVGO
+            IFB X, 1 ; Top bit clear
+                JMP FDIVGO
 :FDIVDEN2   SHR X, 1
-			SUB [FACEXP], 1
-			IFC X, 1
-			    JMP FDIVDEN2
+            SUB [FACEXP], 1
+            IFC X, 1
+                JMP FDIVDEN2
 :FDIVGO
             DIV Y, X    ; ARGHO = ARGHO / FACHO
             SET [FACHO+1], EX
@@ -557,11 +599,11 @@
             SET A, 1 ; "stop" bit -- when this 1 goes off the
                      ; left side of A, we store the byte to [X+1].
 :ROMBB29    SET Y, [ARGHO]
-			SUB Y, [FACHO]
-			IFN Y, 0
-			    JMP ROMBB3F
-			SET Y, [ARGHO+1]
-			SUB Y, [FACHO+1]
+            SUB Y, [FACHO]
+            IFN Y, 0
+                JMP ROMBB3F
+            SET Y, [ARGHO+1]
+            SUB Y, [FACHO+1]
             ;6502: Carry bit is set if ARGHO >= FACHO
             ; or if the shift-left at ROMBB4F
             ; resulted in an overflow
@@ -580,8 +622,8 @@
             ADD X, 1  
             SET [X], A
 :FDIVTEST   ;SET B, [FACEXP]
-			;DAT 0x5800
-			IFE X, RESHO+1
+            ;DAT 0x5800
+            IFE X, RESHO+1
                 JMP ROMBB7A  ; just do two more bits
             IFG X, RESHO+1
                 JMP ROMBB7E  ; Store last two bits in [FACOV]
@@ -604,7 +646,7 @@
             SBX [ARGHO], [FACHO]
             JMP ROMBB4F
 :ROMBB7A    SET A, 0x4000 ; "stop" bit of FACOV
-			JMP ROMBB4C
+            JMP ROMBB4C
 :ROMBB7E    SHL A, 14 ; originally 6
             SET [FACOV], A
             SET EX, B  ; PLP?
@@ -615,7 +657,7 @@
             SET [FACHO+1], [RESHO+1]
             JMP ROMB8D7 ; normalize before returning
             
-	
+    
 
 ; Move a FP number from memory pointer in A to FAC1
 :MOVFM
@@ -632,12 +674,15 @@
 
 ; Move a FP number from FAC1 to various points in memory
 :MOV2F
+:STORE_FAC_IN_TEMP2_ROUNDED
 :ROMBBC7
-            SET X, RAM5C ; arithmetic register #4
+            SET X, FACTEMP2    ; arithmetic register #4
             IFE X, 0 ; skip next
-:ROMBBCA        SET X, RAM57 ; arithmetic register #3
+:STORE_FAC_IN_TEMP1_ROUNDED
+:ROMBBCA    SET X, FACTEMP1    ; arithmetic register #3
             IFE X, 0 ; skip next
-:ROMBBD0    SET X, [FORPNT]
+:ROMBBD0    SET X, [FORPNT] ; assign to a BASIC variable
+:STORE_FAC_AT_X_ROUNDED
 :ROMBBD4    JSR ROUND
             ; using X instead of $22
             SET [X+2], [FACHO+1] ; low mantissa
@@ -703,8 +748,8 @@
             RTS
 
 ; SGN function
-:ROMBC39
-        JSR SIGN
+:SGNFUNC
+:ROMBC39    JSR SIGN
 
 :GIVAYF ;Convert 16-Bit Signed Integer to Floating Point
 :ROMB391    SET [VALTYP], 0   ; numeric
@@ -749,11 +794,11 @@
 :ROMBC5D    SET X, [I]  ; X contains exponent
 :ROMBC63    ADD I, 1    ; I points to mantissa
             IFE X, 0
-                JMP SIGN ; return sign of FAC1?
+                JMP SIGN    ; return sign of FAC1?
 :ROMBC67    SET A, [I]  ; A contains mantissa 
             XOR A, [FACSGN]
-            IFB A, 0x8000  ; Comparing different signs
-                JMP ROMBC2F
+            IFU A, 0        ; Comparing different signs
+                JMP ROMBC2F ; return sign of FAC1.
             ; Compare exponent, then mantissa
             ; First byte that's different,
             ; return comparison of that byte.
@@ -785,7 +830,7 @@
 :ROMBC92    SET A, [FACSGN]
             IFE EX, 0 ; no underflow in the subtract
                 XOR A, -1
-        	JMP ROMBC31 ; return pure 0 or 1
+            JMP ROMBC31 ; return pure 0 or 1
 
 ; ----------------------------------------------------------------------------
 ; QUICK INTEGER FUNCTION
@@ -828,8 +873,8 @@
             JSR QINT
             SET [FACOV], 0
             SET EX, 0
-			IFU [FACSGN], 0
-				SET EX, -1
+            IFU [FACSGN], 0
+                SET EX, -1
             SET [FACSGN], 0
             SET [FACEXP], 0xA0 ; exponent is 2**32
             SET [RAM07], [RAM64]
@@ -839,7 +884,7 @@
             SET [FACHO+1], 0
             RTS
 
-:DECFLG	DAT 0
+:DECFLG    DAT 0
 :FIN ; convert ascii string to a float in FAC1
 :ROMBCF3    SET Y, 0
             SET X, 0
@@ -930,9 +975,6 @@
             SUB A, 0x30 ; zero
             JSR FINLOG  ; add contents of digit
             JMP ROMBD0A ; go to next character
-
-:DERP DAT 0
-
             
 ; Add signed integer from A to float accu
 :FINLOG
@@ -940,7 +982,7 @@
             JSR MOVAF ; ARG = FAC
             SET A, POP
             JSR ROMBC3C  ; move A into FAC
-			
+            
             SET A, [ARGSGN]
             XOR A, [FACSGN]
             ASR A, 15
@@ -1155,31 +1197,37 @@
             
 ; constant: 1/2 in floating point format
 ; for various rounding purposes.
-:FHALF
+:CON_HALF
 :ROMBF11   DAT 0x80, 0x0000, 0x0000 
 
 ; divisors for decimal conversion
 :FOUTBL
-:ROMBF16   DAT 0xFA0A,0x1F00    ;leftmost digit
-:ROMBF1A   DAT 0x0098,0x9680    ;
-:ROMBF1E   DAT 0xFFF0,0xBDC0    ;
-:ROMBF22   DAT 0x0001,0x86A0    ;
-:ROMBF26   DAT 0xFFFF,0xD8F0    ;
-:ROMBF2A   DAT 0x0000,0x03E8    ;      1000
-:ROMBF2E   DAT 0xFFFF,0xFF9C    ;      -100
-:ROMBF32   DAT 0x0000,0x000A    ;        10
-:ROMBF36   DAT 0xFFFF,0xFFFF    ;        -1
+:ROMBF16   DAT 0xFA0A,0x1F00    ;-100,000,000
+:ROMBF1A   DAT 0x0098,0x9680    ;  10,000,000
+:ROMBF1E   DAT 0xFFF0,0xBDC0    ;  -1,000,000
+:ROMBF22   DAT 0x0001,0x86A0    ;     100,000
+:ROMBF26   DAT 0xFFFF,0xD8F0    ;     -10,000
+:ROMBF2A   DAT 0x0000,0x03E8    ;        1000
+:ROMBF2E   DAT 0xFFFF,0xFF9C    ;        -100
+:ROMBF32   DAT 0x0000,0x000A    ;          10
+:ROMBF36   DAT 0xFFFF,0xFFFF    ;          -1
 :FOUTBLEND
 
 ; divisors for clock conversion (TI$)
 :FDCEND
-    DAT 0xFFDF,0x0A80
-    DAT 0x0003,0x4BC0 ;
-    DAT 0xFFFF,0x7360
-    DAT 0x0000,0x0E10 ;
-    DAT 0xFFFF,0xFDA8
-    DAT 0x0000,0x003C ;    60
+    DAT 0xFFDF,0x0A80 ;-2160000    10:00:00
+    DAT 0x0003,0x4BC0 ;  216000     1:00:00
+    DAT 0xFFFF,0x7360 ;  -36000       10:00
+    DAT 0x0000,0x0E10 ;    3600        1:00
+    DAT 0xFFFF,0xFDA8 ;    -600         :10
+    DAT 0x0000,0x003C ;      60         :01 (1 second = 60 jiffies)
 :FDCENDEND
+
+:SQR
+        JSR MOVAF
+        SET A, CON_HALF
+        JSR MOVFM
+        ; fall through to FPWRT
 
 ; ----------------------------------------------------------------------------
 ; EXPONENTIATION OPERATION
@@ -1187,34 +1235,34 @@
 ; ARG ^ FAC  =  EXP( LOG(ARG) * FAC )
 ; ----------------------------------------------------------------------------
 :FPWRT
-:ROMBF7B	IFE Z, 1  ; ???
-				JMP ROMBFED
-			SET A, [ARGEXP]
-			IFE A, 0
-				JMP ROMB8F7 ; return 0
-			SET X, RAM4E
-			JSR ROMBBD4 ; round FAC1 and move to RAM4E
-			SET A, [RAM6E]
-			IFA A, 0 ; BPL
-				JMP ROMBF9E
-			SET A, RAM4E
-			JSR ROMBC5B
-			IFE Z, 0
-				JMP ROMBF9E
-			SET A, Y
-			SET Y, [RAM07]
-:ROMBF9E	JSR MOVFA ; TODO: original called ROMBBFE.
-					; was this just for efficiency?
-			SET PUSH, Y
-			JSR LOG
-			SET A, RAM4E
-			JSR FMULT   ; FAC *= RAM4E
-			JSR ROMBFED ; EXP function
-			SET A, POP
-			ASR A, 1
-			IFE EX, 0
-				RTS
-			
+:ROMBF7B    IFE Z, 1  ; ???
+                JMP EXP
+            SET A, [ARGEXP]
+            IFE A, 0
+                JMP ROMB8F7 ; return 0
+            SET X, RAM4E
+            JSR STORE_FAC_AT_X_ROUNDED 
+            SET A, [RAM6E]
+            IFA A, 0 ; BPL
+                JMP ROMBF9E
+            SET A, RAM4E
+            JSR FCOMP
+            IFE Z, 0
+                JMP ROMBF9E
+            SET A, Y
+            SET Y, [RAM07] 
+:ROMBF9E    JSR MOVFA ; TODO: original called ROMBBFE.
+                    ; was this just for efficiency?
+            SET PUSH, Y
+            JSR LOG
+            SET A, RAM4E
+            JSR FMULT   ; FAC *= RAM4E
+            JSR EXP ; EXP function
+            SET A, POP
+            ASR A, 1
+            IFE EX, 0
+                RTS
+            
 
 ; MINUS operator
 ; Perform NOT and >
@@ -1228,61 +1276,62 @@
 
 ; 1/LOG(2)
 :CON_LOG_E
-:ROMBFBF	DAT 0x81, 0x38aa, 0x3b29
+:ROMBFBF    DAT 0x81, 0x38aa, 0x3b29
 ; polynomial table
 :POLY_EXP
-:ROMBFC4	DAT 7 ; degree 8
-			DAT 0x71,0x3458,0x3e56
-			dat 0x74,0x167e,0xb31b
-			dat 0x77,0x2fee,0xe385
-			dat 0x7a,0x1d84,0x1c2a
-			dat 0x7c,0x6359,0x580a
-			dat 0x7e,0x75fd,0xe7c6
-			dat 0x80,0x3172,0x1810
-			dat 0x81,0,0
+:ROMBFC4    DAT 7 ; degree 8
+            DAT 0x71,0x3458,0x3e56
+            dat 0x74,0x167e,0xb31b
+            dat 0x77,0x2fee,0xe385
+            dat 0x7a,0x1d84,0x1c2a
+            dat 0x7c,0x6359,0x580a
+            dat 0x7e,0x75fd,0xe7c6
+            dat 0x80,0x3172,0x1810
+            dat 0x81,0,0
 
 ; EXP command
+:EXP
 :ROMBFED    SET A, CON_LOG_E  
-			JSR FMULT
-			SET A, [FACOV]
-			ADD A, 0x5000
-			IFN EX, 0
+            JSR FMULT
+            SET A, [FACOV]
+            ADD A, 0x5000
+            IFN EX, 0
                 JSR INCREMENT_MANTISSA
-:ROME000	SET [ARGOV], A
-			JSR MAF
-			IFG [FACEXP], 0x87 ; FAC >= 256
-:ROME00B		JSR ROMBAD4
-			JSR INT  ; does INT set [CHARAC]?
-			SET A, [CHARAC]
-			ADD A, 0x81
-			IFC A, 0xFF ; BEQ in 8-bit
-				JMP ROME00B
-			SUB A, 1
-			SET PUSH, A
-			; Swap FAC and ARG
-			SET A, [FACEXP]
-			SET X, [FACHO]
-			SET Y, [FACHO+1]
-			SET [FACEXP], [ARGEXP]
-			SET [FACHO], [ARGHO]
-			SET [FACHO+1], [ARGHO+1]
-			SET [ARGEXP], A
-			SET [ARGHO], X
-			SET [ARGHO+1], Y
-			SET [FACOV], [ARGOV]
-			JSR FSUBT
-			JSR NEGOP
-			SET A, ROMBFC4 ; EXP polynomial table
-			JSR POLYNOMIAL
-			SET [ARISGN], 0
-			SET A, POP
-			JSR ROMBAB9 ; add FAC/ARG exponents
-			RTS	
-			
+:ROME000    SET [ARGOV], A
+            JSR MAF
+            IFG [FACEXP], 0x87 ; FAC >= 256
+:ROME00B        JSR ROMBAD4
+            JSR INT  ; does INT set [CHARAC]?
+            SET A, [CHARAC]
+            ADD A, 0x81
+            IFC A, 0xFF ; BEQ in 8-bit
+                JMP ROME00B
+            SUB A, 1
+            SET PUSH, A
+            ; Swap FAC and ARG
+            SET A, [FACEXP]
+            SET X, [FACHO]
+            SET Y, [FACHO+1]
+            SET [FACEXP], [ARGEXP]
+            SET [FACHO], [ARGHO]
+            SET [FACHO+1], [ARGHO+1]
+            SET [ARGEXP], A
+            SET [ARGHO], X
+            SET [ARGHO+1], Y
+            SET [FACOV], [ARGOV]
+            JSR FSUBT
+            JSR NEGOP
+            SET A, POLY_EXP ; EXP polynomial table
+            JSR POLYNOMIAL
+            SET [ARISGN], 0
+            SET A, POP
+            JSR ROMBAB9 ; add FAC/ARG exponents
+            RTS    
+            
 
 ; float numbers for RND
-:ROME08D	DAT 0x98, 0x3544, 0x7A00
-:ROME092	DAT 0x68, 0x2881, 0x4600
+:ROME08D    DAT 0x98, 0x3544, 0x7A00  ; multiplied by this
+:ROME092    DAT 0x68, 0x2881, 0x4600  ; added to this
 
 ; ----------------------------------------------------------------------------
 ; ODD POLYNOMIAL SUBROUTINE
@@ -1290,20 +1339,20 @@
 ; F(X) = X * P(X^2)
 ;
 ; WHERE:  X IS VALUE IN FAC
-;	A POINTS AT COEFFICIENT TABLE
-;	FIRST BYTE OF COEFF. TABLE IS N
-;	COEFFICIENTS FOLLOW, HIGHEST POWER FIRST
+;    A POINTS AT COEFFICIENT TABLE
+;    FIRST BYTE OF COEFF. TABLE IS N
+;    COEFFICIENTS FOLLOW, HIGHEST POWER FIRST
 ;
 ; P(X^2) COMPUTED USING NORMAL POLYNOMIAL SUBROUTINE
 ; ----------------------------------------------------------------------------
 :POLYNOMIAL_ODD
-:ROME043	SET [RAM71], A
-			JSR ROMBBCA ; move FAC1 to FAC3
-			SET A, RAM57
-			JSR FMULT
-			JSR SERMAIN
-			SET A, RAM57
-			JMP FMULT
+:ROME043    SET [RAM71], A
+            JSR STORE_FAC_IN_TEMP1_ROUNDED
+            SET A, FACTEMP1
+            JSR FMULT
+            JSR SERMAIN
+            SET A, FACTEMP1
+            JMP FMULT
 
 ; ----------------------------------------------------------------------------
 ; NORMAL POLYNOMIAL SUBROUTINE
@@ -1311,135 +1360,193 @@
 ; P(X) = C(0)*X^N + C(1)*X^(N-1) + ... + C(N)
 ;
 ; WHERE:  X IS VALUE IN FAC
-;	A POINTS AT COEFFICIENT TABLE
-;	FIRST BYTE OF COEFF. TABLE IS N
-;	COEFFICIENTS FOLLOW, HIGHEST POWER FIRST
+;    A POINTS AT COEFFICIENT TABLE
+;    FIRST BYTE OF COEFF. TABLE IS N
+;    COEFFICIENTS FOLLOW, HIGHEST POWER FIRST
 ; ----------------------------------------------------------------------------
 :POLYNOMIAL
-:ROME059	SET [RAM71], A
+:ROME059    SET [RAM71], A
 :SERMAIN
-:ROME05D	JSR MOV2F ; move FAC1 to RAM5C
-			SET Y, [RAM71]
-:ROME060	SET [SERLEN], [Y]
-			ADD Y, 1
-			SET [RAM71], Y
-			SET A, Y
-:ROME070	JSR FMULT
-			SET A, [RAM71]
-			ADD A, 3
-			SET [RAM71], A
-			JSR FADD
-			SET A, RAM5C
-			SUB [SERLEN], 1
-			IFN [SERLEN], 0
-				JMP ROME070
-			RTS
-			
+:ROME05D    JSR MOV2F ; move FAC1 to FACTEMP2
+            SET Y, [RAM71]
+:ROME060    SET [SERLEN], [Y]
+            ADD Y, 1
+            SET [RAM71], Y
+            SET A, Y
+:ROME070    JSR FMULT
+            SET A, [RAM71]
+            ADD A, 3
+            SET [RAM71], A
+            JSR FADD
+            SET A, FACTEMP2
+            SUB [SERLEN], 1
+            IFN [SERLEN], 0
+                JMP ROME070
+            RTS
+            
 
 ; RND FUNCTION
-:ROME097	JSR SIGN
-			IFE A, -1
-				JMP ROME0D3
-			IFE A, 1
-				JMP ROME0BE
-			JSR ROMFFF3
-			SET I, X
-			; apparently I'm supposed to re-seed
-			; FACHO with 32 bits of randomness
-			; coming from there... not sure
-			; what the best DCPU equialent is
-			; just yet.
-:ROME0BE	SET A, RNDX ; RND seed in RAM
-			JSR MOVFM
-			SET A, ROME08D
-			JSR FMULT
-			SET A, ROME092
-			JSR FADD
-			; jumble bytes
-:ROME0D3	SET A, [FACHO]
-			SET X, [FACHO+1]
-			SHR A, 8
-			BOR A, EX 
-			SHL X, 8
-			BOR X, EX
-			SET [FACHO+1], A
-			SET [FACHO], X
-:ROME0E3	SET [FACSGN], 0
-			SET [FACOV], [FACEXP]
-			SET [FACEXP], 0x80 ; LET FAC < 1
-			JSR ROMB8D7 ; Normalize
-			SET X, RNDX
-:ROME0F6	JMP ROMBBD4 ; round FAC1 and move to X
+:RND
+:ROME097    JSR SIGN
+            IFE A, -1
+                JMP ROME0D3
+            IFE A, 1
+                JMP ROME0BE
+            JSR ROMFFF3
+            SET I, X
+            ; apparently I'm supposed to re-seed
+            ; FACHO with 32 bits of randomness
+            ; coming from there... not sure
+            ; what the best DCPU equialent is
+            ; just yet.
+:ROME0BE    SET A, RNDX ; RND seed in RAM
+            JSR MOVFM
+            SET A, ROME08D
+            JSR FMULT
+            SET A, ROME092
+            JSR FADD
+            ; jumble bytes
+:ROME0D3    SET A, [FACHO]
+            SET X, [FACHO+1]
+            SHR A, 8
+            BOR A, EX 
+            SHL X, 8
+            BOR X, EX
+            SET [FACHO+1], A
+            SET [FACHO], X
+:ROME0E3    SET [FACSGN], 0
+            SET [FACOV], [FACEXP]
+            SET [FACEXP], 0x80 ; LET FAC < 1
+            JSR ROMB8D7 ; Normalize
+            SET X, RNDX
+:ROME0F6    JMP STORE_FAC_AT_X_ROUNDED 
 
 ; COS function
-:ROME264	SET A, ROME2E0 
-			JSR FADD
+:COS
+:ROME264    SET A, CON_PI_HALF
+            JSR FADD
 ; SIN function
-:ROME26B	JSR MOVAF
-			SET A, ROME2E5
-			SET X, [ARGSGN]
-			JSR ROMBB07  ; divide by 2*PI
-			JSR MOVAF
-			JSR INT   ; really?
-			SET [ARISGN], 0
-			JSR FSUBT
-			SET A, ROME2EA
-			JSR FSUB
-			SET A, [FACSGN]
-			SET PUSH, A
-			IFA A, -1
-				JMP ROME29D
-			JSR FADDH
-			SET A, [FACSGN]
-			IFU A, 0
-				JMP ROME2A0
-			XOR [RAM12], -1 ; ???
-:ROME29D	JSR NEGOP
-:ROME2A0	SET A, ROME2EA
-			JSR FADD
-			SET A, POP
-			IFA A, -1
-				JMP ROME2AD
-			JSR NEGOP
-:ROME2AD	SET A, ROME2EF
-			JMP POLYNOMIAL_ODD
+:SIN
+:ROME26B    JSR MOVAF
+            SET A, CON_PI_DOUB
+            SET X, [ARGSGN]
+            JSR DIV
+            JSR MOVAF
+            JSR INT   ; really?
+            SET [ARISGN], 0
+            JSR FSUBT
+; ----------------------------------------------------------------------------
+; (FAC) = ANGLE AS A FRACTION OF A FULL CIRCLE
+;
+; NOW FOLD THE RANGE INTO A QUARTER CIRCLE
+;
+; <<< THERE ARE MUCH SIMPLER WAYS TO DO THIS >>>
+; ----------------------------------------------------------------------------
+            SET A, QUARTER
+            JSR FSUB
+            SET A, [FACSGN]
+            SET PUSH, A
+            IFA A, -1
+            JMP SIN1
+            JSR FADDH
+            SET A, [FACSGN]
+            IFU A, 0
+                JMP ROME2A0
+            XOR [RAM12], -1 ; ???
+:SIN1
+:ROME29D    JSR NEGOP
+:ROME2A0    SET A, QUARTER
+            JSR FADD
+            SET A, POP
+            IFA A, -1
+                JMP ROME2AD
+            JSR NEGOP
+:ROME2AD    SET A, POLY_SIN
+            JMP POLYNOMIAL_ODD
 
 ; TAN function
-:ROME2B4	JSR ROMBBCA ; move FAC1 to FAC3
-			SET [RAM12], 0
-			JSR ROME26B
-			SET X, [RAM4E]
-			JSR ROME0F6 ; round FAC1 and move to X
-			SET A, [RAM57] ; FAC3
-			JSR MOVFM   ; FAC1 <- FAC3
-			SET [FACSGN], 0
-			SET A, [RAM12]
-			JSR ROME2DC
-			SET A, [RAM4E]
-			JMP FDIV ; ohshi--
+:TAN
+:ROME2B4    JSR STORE_FAC_IN_TEMP1_ROUNDED
+            SET [RAM12], 0
+            JSR SIN
+            SET X, [RAM4E]
+            JSR ROME0F6 ; round FAC1 and move to X
+            SET A, FACTEMP1
+            JSR MOVFM   ; FAC1 <- FACTEMP1
+            SET [FACSGN], 0
+            SET A, [RAM12]
+            JSR ROME2DC
+            SET A, [RAM4E]
+            JMP FDIV ; ohshi--
 
-:RAM4E	DAT 0, 0, 0
+:ROME2DC    SET PUSH, A
+            JMP SIN1
 
-:ROME2DC	SET PUSH, A
-			JMP ROME29D
-			
+; ----------------------------------------------------------------------------
+; "ATN" FUNCTION
+; ----------------------------------------------------------------------------
+:ATN
+        SET A, [FACSGN]
+	SET PUSH, A
+	IFA A, -1
+            JMP L3FDB
+        JSR NEGOP
+:L3FDB
+        SET A, [FACEXP]
+	SET PUSH, A
+	IFL A, 0x81
+            JMP L3FE9
+        SET A, FONE
+        JSR FDIV
+; ----------------------------------------------------------------------------
+; 0 <= X <= 1
+; 0 <= ATN(X) <= PI/8
+; ----------------------------------------------------------------------------
+:L3FE9  SET A, POLY_ATN
+        JSR POLYNOMIAL_ODD
+        SET A, POP
+        IFL A, 0x81
+            JMP L3FFC
+        SET A, CON_PI_HALF
+        JSR FSUB
+:L3FFC  SET A, POP
+        IFU A, 0
+            JMP NEGOP
+        RTS
+
+:POLY_ATN
+        DAT 11
+        DAT 0x76,0xB383,0xBDD3
+        DAT 0x79,0x1EF4,0xA6F5
+        DAT 0x7B,0x83FC,0xB010
+        DAT 0x7C,0x0C1F,0x67CA
+        DAT 0x7C,0xDE53,0xCBC1
+        DAT 0x7D,0x1464,0x704C
+        DAT 0x7D,0xB7EA,0x517A
+        DAT 0x7D,0x6330,0x887E
+        DAT 0x7E,0x9244,0x993A
+        DAT 0x7E,0x4CCC,0x91C7
+        DAT 0x7F,0xAAAA,0xAA13
+        DAT 0x81,0x0000,0x0000
+
+            
 ; float numbers for trigonometry
 
-; 0.5 * pi
-:ROME2E0	DAT 0x81, 0x490F, 0xDAA2
-; 2 * pi
-:ROME2E5	DAT 0x83, 0x490F, 0xDAA2
-; 0.25
-:ROME2EA	DAT 0x7F, 0, 0
+:CON_PI_HALF
+:ROME2E0    DAT 0x81, 0x490F, 0xDAA2
+:CON_PI_DOUB
+:ROME2E5    DAT 0x83, 0x490F, 0xDAA2
+:QUARTER    DAT 0x7F, 0, 0
 
 ; Polynomial table
-:ROME2EF	DAT 5  ; degree 6
-:ROME2F0	DAT 0x84, 0xE61A, 0x2D1B
-			DAT 0x86, 0x2807, 0xfbf8
-			DAT 0x87, 0x9968, 0x8901
-			DAT 0x87, 0x2335, 0xdfe1
-			DAT 0x86, 0xa55d, 0xe728
-			DAT 0x83, 0x490f, 0xdaa2
+:POLY_SIN
+:ROME2EF    DAT 5  ; degree 6
+            DAT 0x84, 0xE61A, 0x2D1B
+            DAT 0x86, 0x2807, 0xfbf8
+            DAT 0x87, 0x9968, 0x8901
+            DAT 0x87, 0x2335, 0xdfe1
+            DAT 0x86, 0xa55d, 0xe728
+            DAT 0x83, 0x490f, 0xdaa2
 
 :XFACCRASH  SET I, [X+1]
             SET J, [X+2]
@@ -1458,3 +1565,5 @@
             SET Z, [FACOV]
             BOR 0xBCBC, 0xBCBC
             JMP CRASH
+
+

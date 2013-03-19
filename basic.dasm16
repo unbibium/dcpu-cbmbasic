@@ -226,19 +226,19 @@
             DAT 0xAB7A
             DAT STMT_NEW
 :FUNCTION_ROUTINES 
-            DAT SIGN    ; sgn
+            DAT SGNFUNC ; sgn
             DAT INT     ; int
             DAT ROMBC58 ; abs
             DAT 0x0310  ; usr
             DAT ROMB37D  ; fre
             DAT ROMB39E  ; pos
-            DAT 0xBF71  ; sqr
-            DAT ROME097  ; rnd
-            DAT 0xB9EA  ; log
-            DAT ROMBFED ; exp
-            DAT ROME264  ; cos
-            DAT ROME26B  ; sin
-            DAT ROME2B4  ; tan
+            DAT SQR
+            DAT RND
+            DAT LOG
+            DAT EXP
+            DAT COS
+            DAT SIN
+            DAT TAN
             DAT 0xE30E  ; atn
             DAT 0xB80D  ; peek
             DAT ROMB77C  ; len
@@ -3182,7 +3182,7 @@
 :LEFTD
 :ROMB700    JSR PREAM
             SET X, 0
-:ROMB706    IFL A, [Y]  ; if parameter is longet than length
+:ROMB706    IFL A, [Y]  ; if parameter is longer than length
                 JMP ROMB70C
             SET A, [Y]
             SET X, 0
@@ -3228,10 +3228,11 @@
 :ROMB75F    JMP ROMB70E
 
 ; special cases for MID$
-:ROMB70D    SET PUSH, A
+:ROMB70D    SET PUSH, A ; push starting index
             IFE 1, 0
-:ROMB70E    SET PUSH, X
+:ROMB70E    SET PUSH, X ; push starting index
             SET PUSH, Y
+            SET A, [RAM64]
             JMP ROMB70F
 
 :ROMB39E    SET C, 1
@@ -3244,12 +3245,12 @@
 ; returns Y as pointer to string descriptor
 :PREAM
 :ROMB761    JSR CHKCLS
-            SET X, POP ; RTS address (was 2)
+            SET J, POP ; RTS address (was 2)
             SET A, POP ; discard - was 2
             SET A, POP ; first numeric parameter
             SET Y, POP ; pointer to string descriptor
             SET [DSCPNT], Y
-            JMP X
+            JMP J
 
 ; LEN function 
 :ROMB77C    JSR GETSTR
