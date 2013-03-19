@@ -102,6 +102,8 @@
         JMP SCANSPECIAL
     IFB Y, 0x80
         JMP SCANARROWS
+    IFE Y, 0x7E     ; TILDE
+        JMP SCAN_PI 
     SET [SFDX], Y
     ; handle letter shifting
     IFG Y, 0x60 ; lowercase letters
@@ -110,6 +112,10 @@
       IFL Y, 0x5B
         ADD [SFDX], 0x80
     RTS
+
+:SCAN_PI
+	SET [SFDX], 0xFF
+	RTS
 
 :SCANSPECIAL
     SET [SFDX], CBM_RETURN

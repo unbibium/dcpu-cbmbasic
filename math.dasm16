@@ -24,9 +24,9 @@
 :FACSGN
 :RAM66 DAT 0
 
-:RAM67 ; Number of terms in a series evaluation
-       ; OR, a sign flag somewhere in FIN.
-:SGNFLG  DAT 0
+:RAM67 
+:SERLEN         ; Number of terms in a series evaluation
+:SGNFLG  DAT 0  ; OR, a sign flag somewhere in FIN.
 
 :RAM68 ; FAC 1 Overflow during conversions
 :BITS   DAT 0
@@ -664,6 +664,7 @@
 :MOVAF 
 :ROMBC0C    JSR ROUND
 :MOVEF
+:MAF
 :ROMBC0F    SET [ARGSGN], [FACSGN]
             ASR [ARGSGN], 15 ; Attempt
             SET [ARGHO+1], [FACHO+1]
@@ -681,6 +682,7 @@
             IFA [FACOV], -1
                 RTS 
             ; high bit of FACOV is set, increment mantissa
+:INCREMENT_MANTISSA
 :ROMBC23    ADD [FACHO+1], 1
             ADX [FACHO], 0  
             IFE EX, 0
@@ -1220,8 +1222,10 @@
 ; float constants for EXP
 
 ; 1/LOG(2)
+:CON_LOG_E
 :ROMBFBF	DAT 0x81, 0x38aa, 0x3b29
 ; polynomial table
+:POLY_EXP
 :ROMBFC4	DAT 7 ; degree 8
 			DAT 0x71,0x3458,0x3e56
 			dat 0x74,0x167e,0xb31b
@@ -1233,19 +1237,18 @@
 			dat 0x81,0,0
 
 ; EXP command
-:ROMBFED    SET A, ROMBFBF
+:ROMBFED    SET A, CON_LOG_E  
 			JSR FMULT
-			SET A, [RAM70]
-			ADD A, 0x50 ; wat?
-			IFL A, 0x100
-				JMP ROME000
-			JSR ROMBC23
-:ROME000	SET [RAM56], A
-			JSR ROMBC0F
+			SET A, [FACOV]
+			ADD A, 0x5000
+			IFN EX, 0
+                JSR INCREMENT_MANTISSA
+:ROME000	SET [ARGOV], A
+			JSR MAF
 			IFG [FACEXP], 0x87 ; FAC >= 256
 :ROME00B		JSR ROMBAD4
-			JSR ROMBCCC
-			SET A, [RAM07]
+			JSR INT  ; does INT set [CHARAC]?
+			SET A, [CHARAC]
 			ADD A, 0x81
 			IFC A, 0xFF ; BEQ in 8-bit
 				JMP ROME00B
@@ -1261,11 +1264,11 @@
 			SET [ARGEXP], A
 			SET [ARGHO], X
 			SET [ARGHO+1], Y
-			SET [RAM70], [RAM56]
+			SET [FACOV], [ARGOV]
 			JSR FSUBT
 			JSR NEGOP
 			SET A, ROMBFC4 ; EXP polynomial table
-			JSR ROME059
+			JSR POLYNOMIAL
 			SET [ARISGN], 0
 			SET A, POP
 			JSR ROMBAB9 ; add FAC/ARG exponents
@@ -1276,28 +1279,54 @@
 :ROME08D	DAT 0x98, 0x3544, 0x7A00
 :ROME092	DAT 0x68, 0x2881, 0x4600
 
-; compute odd degrees for SIN and ATN
+; ----------------------------------------------------------------------------
+; ODD POLYNOMIAL SUBROUTINE
+;
+; F(X) = X * P(X^2)
+;
+; WHERE:  X IS VALUE IN FAC
+;	A POINTS AT COEFFICIENT TABLE
+;	FIRST BYTE OF COEFF. TABLE IS N
+;	COEFFICIENTS FOLLOW, HIGHEST POWER FIRST
+;
+; P(X^2) COMPUTED USING NORMAL POLYNOMIAL SUBROUTINE
+; ----------------------------------------------------------------------------
+:POLYNOMIAL_ODD
 :ROME043	SET [RAM71], A
 			JSR ROMBBCA ; move FAC1 to FAC3
 			SET A, RAM57
 			JSR FMULT
-			JSR ROME05D
+			JSR SERMAIN
 			SET A, RAM57
 			JMP FMULT
-; compute polynomials
+
+; ----------------------------------------------------------------------------
+; NORMAL POLYNOMIAL SUBROUTINE
+;
+; P(X) = C(0)*X^N + C(1)*X^(N-1) + ... + C(N)
+;
+; WHERE:  X IS VALUE IN FAC
+;	A POINTS AT COEFFICIENT TABLE
+;	FIRST BYTE OF COEFF. TABLE IS N
+;	COEFFICIENTS FOLLOW, HIGHEST POWER FIRST
+; ----------------------------------------------------------------------------
+:POLYNOMIAL
 :ROME059	SET [RAM71], A
+:SERMAIN
 :ROME05D	JSR MOV2F ; move FAC1 to RAM5C
 			SET Y, [RAM71]
-:ROME060	SET A, [Y]
-			SET [RAM67], A
+:ROME060	SET [SERLEN], [Y]
 			ADD Y, 1
 			SET [RAM71], Y
+			SET A, Y
 :ROME070	JSR FMULT
-			ADD [RAM71], 5
+			SET A, [RAM71]
+			ADD A, 3
+			SET [RAM71], A
 			JSR FADD
 			SET A, RAM5C
-			SUB [RAM67], 1
-			IFN [RAM67], 0
+			SUB [SERLEN], 1
+			IFN [SERLEN], 0
 				JMP ROME070
 			RTS
 			
@@ -1368,7 +1397,7 @@
 				JMP ROME2AD
 			JSR NEGOP
 :ROME2AD	SET A, ROME2EF
-			JMP ROME043
+			JMP POLYNOMIAL_ODD
 
 ; TAN function
 :ROME2B4	JSR ROMBBCA ; move FAC1 to FAC3
