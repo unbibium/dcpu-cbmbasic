@@ -267,7 +267,7 @@
         DAT 0x7B
         DAT FDIVT   ; divide
         DAT 0x7F
-        DAT ROMBF7B   ; power
+        DAT FPWRT   ; power
         DAT 0x50
         DAT ANDOP   ; AND
         DAT 0x46

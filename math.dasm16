@@ -1165,23 +1165,28 @@
 :ROMBF1E   DAT 0xFFF0,0xBDC0    ;
 :ROMBF22   DAT 0x0001,0x86A0    ;
 :ROMBF26   DAT 0xFFFF,0xD8F0    ;
-:ROMBF2A   DAT 0x0000,0x03E8    ;
-:ROMBF2E   DAT 0xFFFF,0xFF9C    ;
-:ROMBF32   DAT 0x0000,0x000A    ;
-:ROMBF36   DAT 0xFFFF,0xFFFF    ;rightmost digit
+:ROMBF2A   DAT 0x0000,0x03E8    ;      1000
+:ROMBF2E   DAT 0xFFFF,0xFF9C    ;      -100
+:ROMBF32   DAT 0x0000,0x000A    ;        10
+:ROMBF36   DAT 0xFFFF,0xFFFF    ;        -1
 :FOUTBLEND
 
 ; divisors for clock conversion (TI$)
 :FDCEND
     DAT 0xFFDF,0x0A80
-    DAT 0x0003,0x4BC0
+    DAT 0x0003,0x4BC0 ;
     DAT 0xFFFF,0x7360
-    DAT 0x0000,0x0E10
+    DAT 0x0000,0x0E10 ;
     DAT 0xFFFF,0xFDA8
-    DAT 0x0000,0x003C
+    DAT 0x0000,0x003C ;    60
 :FDCENDEND
 
-; power operator
+; ----------------------------------------------------------------------------
+; EXPONENTIATION OPERATION
+;
+; ARG ^ FAC  =  EXP( LOG(ARG) * FAC )
+; ----------------------------------------------------------------------------
+:FPWRT
 :ROMBF7B	IFE Z, 1  ; ???
 				JMP ROMBFED
 			SET A, [ARGEXP]
