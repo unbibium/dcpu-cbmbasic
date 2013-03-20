@@ -41,10 +41,12 @@ mostly like they do on the C64:
 * Immediate mode
 * BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, ON,
                   NEW, STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT
-* BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$, ASC
+* BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$, ASC, EXP,
+                   SIN, COS, LOG, SPC
 * PETSCII control codes for color change, reverse text, cursor
   movement, and switching between graphics and lowercase character
-  sets.
+  sets.  Quote mode allows control characters to be typed into
+  programs.
 * BASIC keyword abbreviations with shifted second letters
 * The ? abbreviation for PRINT
 * Expressions involving floating-point addition, subtraction,
@@ -62,14 +64,19 @@ mostly like they do on the C64:
 
 Just about anything else won't work, and may even crash the machine.
 Here's what's missing, in the rough order of when I'm going to add it:
-* other functions (MID$, VAL, PEEK, POS)
+* other functions (MID$, VAL, PEEK, POS, TAB)
 * Program storage (LOAD, SAVE, VERIFY)
 * File access (OPEN, CLOSE, GET, GET#, INPUT#, PRINT#, CMD)
-* Exponents and logarithms (EXP, LOG, ^ operator)
-* POKE and PEEK (I'll need to stabilize the memory map first)
-* Trigonometry (SIN, COS, TAN, ATN)
+* 32-bit division (currently the power operator
+    * LOG, power, and TAN depend on this.
+* POKE, WAIT, and PEEK (I'll need to stabilize the memory map first)
+* More trigonometry (TAN, ATN)
 * Special variables ST, TI, TI$
 * Functions (DEF FN)
+* a few DCPU-specific uses, like using DIM to allocate memory
+  for the SPED-3.
+* direct DCPU access with SYS, USR()
+* Non-blinking reverse text.
 
 Additionally, the code needs to be optimized and cleaned up.
 Many speed gains are possible, though it may never be as fast
@@ -91,7 +98,8 @@ I've used the following online resources to make this work:
   <http://www.ffd2.com/fridge/docs/c64-diss.html>
 * Create Your Own Version of Microsoft BASIC for 6502
   This has some source code listings that explained things a little
-  more thoroughly.
+  more thoroughly.  You'll see chunks of comments pasted from here
+  in the source.
   <http://www.pagetable.com/?p=46>
 
 DISCLAIMER:
@@ -101,8 +109,9 @@ you will not go to space today.  There's a good chance this project
 will never be as bug-free as the original product, though it's
 possible the program's components can be separated, depending on
 how thoroughly useful it becomes.  The floating point routines can
-probably be separated, and the BASIC can certainly be separated
-from the KERNAL.
+probably be separated, and the BASIC can certainly be separated.
+Screen I/O would probably be faster in an OS that wasn't trying
+so hard to be a Commodore 64.
 
 Another promising interpreter for the DCPU-16 is dcpu-admiral,
 which aims to be more Python-like:

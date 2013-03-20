@@ -155,9 +155,7 @@
             SBX A, [X+1]
             SET [FACHO], A
             ; BCS B8D7, then JSR NEGFAC
-:ROMB8D2    ;IFN [ARYTAB], [VARTAB]
-            ;    JMP FACCRASH
-            IFE EX, -1 ; one borrow left to do
+:ROMB8D2    IFE EX, -1 ; one borrow left to do
                 JSR NEGFAC
 :ROMB8D7    SET Y, 0
 :ROMB8D9    SET A, Y
@@ -335,15 +333,13 @@
 
 
 ; FAC1 <- ln FAC1
-; todo: trace through this to see whether
-; the decreased accuracy of FDIV is screwing us.
 :LOG
         JSR SIGN
         IFE A, 0   ;can't LOG(0)
             JMP FCERR
         SET A, [FACEXP]
-        SUB A, 0x7F
-        SET PUSH, A
+        SUB A, 0x80
+        SET PUSH, A  ; store log 2 of FAC
         SET [FACEXP], 0x80
         SET A, CON_SQR_HALF
         JSR FADD              ;BA01
@@ -353,11 +349,10 @@
         JSR FSUB              ;BA0F
         SET A, POLY_LOG
         JSR POLYNOMIAL_ODD
-        ;JMP FACCRASH
         SET A, CON_NEG_HALF
         JSR FADD
-            SET A, POP
-        JSR FINLOG
+        SET A, POP  ; retrieve log 2 of FAC
+        JSR FINLOG  
         SET A, CON_LOG_TWO
         ; fall through to FMULT
 
@@ -402,10 +397,10 @@
 :ROMBA8C    SET [INDEX], A
 :ROMBA8CI   SET [ARGEXP], [A]
             SET B, [A+1]
-            SET [ARGSGN], B
-            ASR [ARGSGN], 15  ; pure 0 or -1
             SET [ARGHO], B
             BOR [ARGHO], 0x8000 ; high bit is always 1
+            ASR B, 15  ; pure 0 or -1
+            SET [ARGSGN], B
             XOR B, [FACSGN]
             ASR B, 15   ; pure 0 or -1
             SET [SGNCPR], B
@@ -433,7 +428,7 @@
 :ROMBAC6    ADD A, 0x80
             AND A, 0xFF
             SET [FACEXP], A
-            IFN A, 0
+            IFE A, 0
                 JMP ROMB8FB ; set FACSGN too and RTS.
             ; put comparison result into SGNCPR
 :ROMBACF    SET [FACSGN], [SGNCPR]
@@ -715,7 +710,6 @@
 :MOVEF
 :MAF
 :ROMBC0F    SET [ARGSGN], [FACSGN]
-            ASR [ARGSGN], 15 ; Attempt
             SET [ARGHO+1], [FACHO+1]
             SET [ARGHO], [FACHO]
             SET [ARGEXP], [FACEXP]
@@ -968,7 +962,7 @@
                 JMP ROMBD5B
 :ROMBD62    SET A, [SGNFLG]
             IFU A, 0  ; BMI
-                JMP NEGOP ; originally via BD67
+                JSR NEGOP ; originally via BD67
             RTS
 ; handle a digit
 :ROMBD6A    SET PUSH, A
@@ -1050,7 +1044,7 @@
             IFU [FACSGN], 0  ; negative
                 SET A, 0x2D ; MINUS
             SET [Y], A
-            SET [FACSGN], A
+            SET [FACSGN], 0 ; was A -- 
             SET [RAM71], Y
             ADD Y, 1
             SET A, 0x30 ; zero
@@ -1240,19 +1234,20 @@
 ; ARG ^ FAC  =  EXP( LOG(ARG) * FAC )
 ; ----------------------------------------------------------------------------
 :FPWRT
-:ROMBF7B    IFE Z, 1  ; ???
+:ROMBF7B    IFE A, 0  ; ???
                 JMP EXP
             SET A, [ARGEXP]
             IFE A, 0
                 JMP ROMB8F7 ; return 0
-            SET X, RAM4E
+            SET Y, 0
+            SET X, FACTEMP3
             JSR STORE_FAC_AT_X_ROUNDED 
-            SET A, [RAM6E]
-            IFA A, 0 ; BPL
+            SET A, [ARGSGN]
+            IFA A, -1 ; BPL
                 JMP ROMBF9E
-            SET A, RAM4E
+            SET A, FACTEMP3
             JSR FCOMP
-            IFE Z, 0
+            IFE A, 0
                 JMP ROMBF9E
             SET A, Y
             SET Y, [RAM07] 
@@ -1260,7 +1255,7 @@
                     ; was this just for efficiency?
             SET PUSH, Y
             JSR LOG
-            SET A, RAM4E
+            SET A, FACTEMP3
             JSR FMULT   ; FAC *= RAM4E
             JSR EXP ; EXP function
             SET A, POP
@@ -1473,14 +1468,14 @@
 :ROME2B4    JSR STORE_FAC_IN_TEMP1_ROUNDED
             SET [RAM12], 0
             JSR SIN
-            SET X, [RAM4E]
+            SET X, [FACTEMP3]
             JSR ROME0F6 ; round FAC1 and move to X
             SET A, FACTEMP1
             JSR MOVFM   ; FAC1 <- FACTEMP1
             SET [FACSGN], 0
             SET A, [RAM12]
             JSR ROME2DC
-            SET A, [RAM4E]
+            SET A, [FACTEMP3]
             JMP FDIV ; ohshi--
 
 :ROME2DC    SET PUSH, A
@@ -1491,14 +1486,14 @@
 ; ----------------------------------------------------------------------------
 :ATN
         SET A, [FACSGN]
-	SET PUSH, A
-	IFA A, -1
+    SET PUSH, A
+    IFA A, -1
             JMP L3FDB
         JSR NEGOP
 :L3FDB
         SET A, [FACEXP]
-	SET PUSH, A
-	IFL A, 0x81
+        SET PUSH, A
+        IFL A, 0x81
             JMP L3FE9
         SET A, FONE
         JSR FDIV
