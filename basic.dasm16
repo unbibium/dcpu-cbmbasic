@@ -539,64 +539,7 @@
 
 :ROMA389   DAT 0xA0
 
-
-.MACRO DO_A(aSub, anArg)
-      SET A, anArg
-      JSR aSub
-.ENDMACRO
-
-:STMT_LOAD
-:STMT_SAVE
-:STMT_VERIFY
-; Not the real verify command but allows me to see
-; various memory sizes at a glance
-    ; display basic text size
-        DO_A(STROUT, TXT_H)
-        DO_A(LINPRT, [TXTTAB])
-        DO_A(CHROUT, 32)
-        SET A, [VARTAB]
-        SUB A, [TXTTAB]
-        JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
-    ; display scalar variable size
-        DO_A(STROUT, VAR_H)
-        DO_A(LINPRT, [VARTAB])
-        DO_A(CHROUT, 32)
-        SET A, [ARYTAB]
-        SUB A, [VARTAB]
-        JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
-    ; display array variable size
-        DO_A(STROUT, ARY_H)
-        DO_A(LINPRT, [ARYTAB])
-        DO_A(CHROUT, 32)
-        SET A, [STREND]
-        SUB A, [ARYTAB]
-        JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
-    ; display free space size
-        DO_A(STROUT, FREE_H)
-        DO_A(LINPRT, [STREND])
-        DO_A(CHROUT, 32)
-        SET A, [FREETOP]
-        SUB A, [STREND]
-        JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
-    ; display string size
-        DO_A(STROUT, STR_H)
-        DO_A(LINPRT, [FREETOP])
-        DO_A(CHROUT, 32)
-        SET A, [MEMSIZ]
-        SUB A, [FREETOP]
-        JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
-        RTS
-
-:TXT_H  DAT "TXT: ", 0
-:VAR_H  DAT "VAR: ", 0
-:ARY_H  DAT "ARY: ", 0
-:FREE_H  DAT "FREE:", 0
-:STR_H  DAT "STR: ", 0
+.include "loadsave.dasm16"
 
 :FNDFOR
 ; Search for "FOR" blocks on stack containing
@@ -738,6 +681,7 @@
 
 ; handle insert/delete basic lines
 :MAIN1
+:NUMBERED_LINE
 :ROMA49C    JSR LINGET   ; get decimal number into [LINNUM]
             JSR CRUNCH   ; token cruncher
             ; why is this too short?
@@ -762,8 +706,8 @@
                 JMP ROMA4A9L
             SET [I], [J]
 ; insert new line.
-:ROMA4ED    JSR ROMA659 ; clear variable memory
-            JSR LINKPRG ; relink basic program
+:ROMA4ED    JSR SETPTRS ; clear variable memory
+            JSR FIX_LINKS ; relink basic program
             SET A, [RAM0200]
             IFE A, 0   ; No text entered
                 JMP MAIN ; delete only; return to prompt
@@ -787,12 +731,15 @@
             STD [I], [J]
             IFN J, RAM01FE
                 JMP ROMA522L
-:ROMA52A    JSR ROMA659 ; clr?
-            JSR LINKPRG
+:ROMA52A    JSR SETPTRS ; clr?
+            JSR FIX_LINKS
             JMP [IMAIN]
 
-; relink basic program
-:LINKPRG
+; ----------------------------------------------------------------------------
+; CLEAR ALL VARIABLES
+; RE-ESTABLISH ALL FORWARD LINKS
+; ----------------------------------------------------------------------------
+:FIX_LINKS
 :ROMA533    
             SET I, [TXTTAB]
             SET J, I   ; note beginning of line
@@ -978,12 +925,14 @@
 :STMT_NEW
 :ROMA642    IF_NOT_NEXT_STMT
                 RTS
+:SCRTCH
 :ROMA644    SET I, [TXTTAB]
             STI [I], 0
             STI [I], 0
             SET [I], 0
             SET [VARTAB], I
-:ROMA659    JSR ROMA68E ; set execution pointer to [TXTTAB]-1
+:SETPTRS
+:ROMA659    JSR STXTPT ; set execution pointer to [TXTTAB]-1
 
 :ROMA65C    SET A, 0     ;LDA #$00
             SET Z, 1
@@ -1011,9 +960,10 @@
             SET [SUBFLG], 0
 :ROMA68D    RTS
 
-; set current character pointer to start of basic - 1
-; return A
-
+; ----------------------------------------------------------------------------
+; SET TXTPTR TO BEGINNING OF PROGRAM
+; ----------------------------------------------------------------------------
+:STXTPT
 :ROMA68E    SET A, [TXTTAB]
             SUB A, 1
             SET [RAM7A], A
@@ -1263,7 +1213,7 @@
             JSR SETMSG
             SET Z, POP
             IF_NEXT_STMT ; Not zero
-                JMP ROMA659 ; clear variable memory
+                JMP SETPTRS ; clear variable memory
 
 :ROMA87D    JSR ROMA660      ; do CLR
             JMP ROMA897      ; do GOTO
@@ -3391,7 +3341,7 @@
             ; prefill keyboard buffer with 
             JSR RUN_TEST_STRING
             ; go to READY prompt
-            JMP ROMA644  ; NEW statement.
+            JMP SCRTCH  ; NEW statement.
             
 ; startup messages
 
