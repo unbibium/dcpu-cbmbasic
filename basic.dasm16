@@ -208,12 +208,12 @@
             DAT STMT_REM   
             DAT STMT_STOP  
             DAT STMT_ON
-            DAT 0xB82C
-            DAT 0xE167
-            DAT 0xE155
+            DAT STMT_WAIT
+            DAT STMT_LOAD
+            DAT STMT_SAVE
             DAT STMT_VERIFY
             DAT 0xB3B2
-            DAT 0xB823
+            DAT STMT_POKE
             DAT STMT_PRINTN
             DAT STMT_PRINT
             DAT STMT_CONT
@@ -239,8 +239,8 @@
             DAT COS
             DAT SIN
             DAT TAN
-            DAT 0xE30E  ; atn
-            DAT 0xB80D  ; peek
+            DAT ATN  ; atn
+            DAT PEEKFUNC  ; peek
             DAT ROMB77C  ; len
             DAT STRD
             DAT 0xB7AD
@@ -545,6 +545,8 @@
       JSR aSub
 .ENDMACRO
 
+:STMT_LOAD
+:STMT_SAVE
 :STMT_VERIFY
 ; Not the real verify command but allows me to see
 ; various memory sizes at a glance
@@ -3323,24 +3325,7 @@
 :ROMB7E2    SET [RAM7A], [RAM71]
             RTS
 
-; get a POKE address
-:ROMB7EB    JSR FRMNUM  ; get an int
-            JSR GETADR ; convert to integer
-            JSR CHKCOM ; check for comma
-            JMP GETBYT ; get a byte value
-
-; convert float to integer
-
-:GETADR
-:ROMB7F7    
-        IFU [FACSGN], 0 ; negative number
-            JMP FCERR
-        IFG [FACEXP], 0x90 ; > 65535
-            JMP FCERR ;illegal quantity
-        JSR QINT
-        SET [LINNUM], [RAM64]
-        RTS
-
+.include "poke.dasm16"
 
 :ROME386
             SET X, 0x80
