@@ -3,8 +3,20 @@
       JSR aSub
 .ENDMACRO
 
+; stub for loading a demo from another part of RAM
 :STMT_LOAD
+    SET I, DEMO
+    SET J, BASICMEM+1
+:LOADLOOP
+	STI [J], [I]
+	IFL I, DEMO_END
+	    JMP LOADLOOP
+	SET [VARTAB], J
+	JSR FIX_LINKS
+	RTS
+    
 :STMT_SAVE
+    RTS
 :STMT_VERIFY
 ; Not the real verify command but allows me to see
 ; various memory sizes at a glance
@@ -56,3 +68,5 @@
 :FREE_H  DAT "FREE:", 0
 :STR_H  DAT "STR: ", 0
 
+
+.include "demo.dasm16"
