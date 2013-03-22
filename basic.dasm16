@@ -1499,7 +1499,7 @@
 :ROMAA4B    SET A, [RAM64] ; take pointer
             JMP ROMAA68    ; move descriptor into variable
 :ROMAA52    SET A, [Y]
-            JSR ROMB475
+            JSR STRINI
             SET [RAM6F], [DSCPNT]  ;TODO: check order
             JSR MOVINS  ; move string
             SET A, FACEXP
@@ -2802,8 +2802,16 @@
 :ROMB46F    SET A, FLOATSTR-1
             JMP STRLIT
             
-            ; create pointers to the string
+; ----------------------------------------------------------------------------
+; GET SPACE AND MAKE DESCRIPTOR FOR STRING WHOSE
+; ADDRESS IS IN RAM64 AND WHOSE LENGTH IS IN A-REG
+; ----------------------------------------------------------------------------
+:STRINI
 :ROMB475    SET [DSCPNT], [RAM64]
+; ----------------------------------------------------------------------------
+; GET SPACE AND MAKE DESCRIPTOR FOR STRING WHOSE
+; ADDRESS IS IN X AND WHOSE LENGTH IS IN A-REG
+; ----------------------------------------------------------------------------
 :STRSPA
 :ROMB47D    JSR GETSPA    ; Allocate Memory in A
             SET [RAM62], X  ; string address 
@@ -2866,7 +2874,7 @@
 :ROMB4BF    ; Y should have a string length now
             ; and RAM6F should be the start of source memory
             SET A, Y        ; send A as length
-            JSR ROMB475     ; send destination in [FRESPC]
+            JSR STRINI     ; send destination in [FRESPC]
             SET X, [RAM6F]  ; send source as X
             JSR MOVSTR     ; move string to [FRESPC]
 ; ----------------------------------------------------------------------------
@@ -2934,7 +2942,7 @@
 ; (A)=# BYTES SPACE TO MAKE
 ;
 ; RETURN WITH (A) SAME,
-;   AND Y,X = ADDRESS OF SPACE ALLOCATED
+;   AND FRESPC = X = ADDRESS OF SPACE ALLOCATED
 ; ----------------------------------------------------------------------------
 :GETSPA
 :ROMB4F4    SHR [GARBFL], 1
@@ -3088,7 +3096,7 @@
                 JMP ROMB65D
             SET X, 0x17 ; ?STRING TOO LONG
             JMP ERROR
-:ROMB65D    JSR ROMB475 ; allocate memory, store len/ptr in A/X
+:ROMB65D    JSR STRINI ; allocate memory, store len/ptr in A/X
             JSR MOVINS  ; move string in [RAM6F] to temporary string
             SET A, [DSCPNT]
             JSR FRETMP ; set [INDEX] to [DSCPNT] then de-allocate 
@@ -3106,8 +3114,8 @@
             SET A, [Y]
             SET X, [Y+1]
 
-; move string with length A, pointer in XY
-; starting from the end of FRESPC.
+; move string with length A,
+; from [INDEX] or X to [FRESPC]
 ; if you jump to MOVSTR1, [INDEX] should already be set
 :MOVSTR
 :ROMB688    SET [INDEX], X
@@ -3128,43 +3136,51 @@
                 JMP ROMB690
 :ROMB699    ADD [FRESPC], A ; set pointer to byte after string
             RTS
-            
-; de-allocate temporary string for immediate use
-; [RAM64] should contain a pointer to a string 
-;         descriptor, set by STRLIT
-; ADDRESS followed by LENGTH
+
 ; returns an address in X
 ;    and a length in A
-
+; ----------------------------------------------------------------------------
+; IF (FAC) IS A TEMPORARY STRING, RELEASE DESCRIPTOR
+; ----------------------------------------------------------------------------
 :FRESTR
 :ROMB6A3    JSR CHKSTR
+; ----------------------------------------------------------------------------
+; IF STRING DESCRIPTOR POINTED TO BY [RAM64] IS
+; A TEMPORARY STRING, RELEASE IT.
+; ----------------------------------------------------------------------------
+:FREFAC
 :ROMB6A6    SET A, [RAM64]
+; ----------------------------------------------------------------------------
+; IF STRING DESCRIPTOR WHOSE ADDRESS IS IN A IS
+; A TEMPORARY STRING, RELEASE IT.
+; ----------------------------------------------------------------------------
 :FRETMP
 :ROMB6AA    SET [INDEX], A
             JSR FRETMS   ; Move LASTPT to TEMPPT
             SET Y, [INDEX] ; though it's also in [INDEX]
             SET A, [Y]    ; length?
             SET X, [Y+1]  ; address?
-            ; originally loaded XY from 3 bytes
             ; Don't deallocate if...
             IFE Z, 0  ; the original A wasn't LASTPT.
                 JMP ROMB6D6
             IFN X, [FREETOP] ; the address isn't top of memory
                 JMP ROMB6D6
+            ; DEALLOCATE bytes
             ADD [FREETOP], A
             ; XY in original 6502
 :ROMB6D6        SET [INDEX], X
 :ROMB6DA        RTS
 
-; if A is an entry on the descriptor stack,
-; set [TEMPPT] to it and remove it from the stack.
+; ----------------------------------------------------------------------------
+; RELEASE TEMPORARY DESCRIPTOR IF A = LASTPT
+; ----------------------------------------------------------------------------
 ; If A is not found, set Z to 0
 :FRETMS
 :ROMB6DB    SET Z, 0
             IFN A, [LASTPT]
                 RTS
             SET [TEMPPT], A
-            SUB A, 2  ; instead of 3
+            SUB A, 2  ; size of a string pointer
             SET [LASTPT], A
             SET Z, 1
             SET Y, 0
@@ -3175,36 +3191,43 @@
             SET A, 1
             JSR STRSPA   ; create a string 
             SET A, POP
-            SET Y, [FACHO]
-            SET [Y], A
+            SET Y, [RAM62]  ; get address
+            SET [Y], A      ; set ASCII value of only character
             SET A, POP
             JMP PUTNEW ; save descriptor in $61 on stack
 :LEFTD
-:ROMB700    JSR PREAM
-            SET X, 0
-:ROMB706    IFL A, [Y]  ; if parameter is longer than length
-                JMP ROMB70C
+:ROMB700    JSR SUBSTRING_SETUP ; return Y as DSCPNT
+            SET A, 0 ; left side
+:ROMB706    IFL A, [Y]  
+                JMP ROMB70C  ; 
+            IFE A, [Y]  
+                JMP ROMB70C  ; 
+            ; if parameter is longer than length
+            ; then return entire string
             SET A, [Y]
-            SET X, 0
-:ROMB70C    SET PUSH, A
-            SET PUSH, X
-            SET PUSH, Y
-:ROMB70F    JSR STRSPA   ; allocate number of bytes in A
-            SET A, [DSCPNT] ; get address
-            JSR FRETMP   ; Allocate string memory
-            SET Y, POP  ; pop address of descriptor
-            SET X, POP  ; pop starting index
-            ADD [INDEX], X
+            SET X, A
+            SET A, 0
+        	;JMP CRASH
+:ROMB70C    SET PUSH, A  ; push starting index
+:ROMB70D    SET A, X
+:ROMB70E    SET PUSH, A  ; push length
+            JSR STRSPA   ; allocate number of bytes in A
+            SET A, [DSCPNT] ; get address of descriptor
+            JSR FRETMP   ; deallocate?
+            ; returns A length and X dest address
+            ; and dest address in [INDEX]
             SET A, POP  ; pop length
-            ;JMP CRASH
+            ; originally only pulled one Y .  
+            SET X, POP  ; pop offset
+            ADD [INDEX], X
             JSR MOVSTR1 ; move string with length A
 :ROMB729    JMP PUTNEW
 :RIGHTD
-:ROMB72D    JSR PREAM ; get parameters
+:ROMB72D    JSR SUBSTRING_SETUP ; get parameters
             ; set starting index to string length
             ; minus the parameter
-            SET X, [Y]
-            SUB X, A
+            SUB A, [Y]
+            MUL A, -1
             JMP ROMB706
 :MIDD
 :ROMB737    SET [RAM64], -1 ; default: get all bytes
@@ -3213,27 +3236,21 @@
                 JMP ROMB748 ; default to end-of-string
             JSR CHKCOM
             JSR GETBYT ; length to extract in [RAM64]
-:ROMB748    JSR PREAM ; get first two parameters
-            IFE A, 0  ; zero index requested
-                JMP ROMB248 ; illegal quantity error
-            SUB A, 1
-            SET PUSH, A ; Push start index
-            SET X, A
-            SUB X, [Y]
-            IFE EX, 0
+:ROMB748    JSR SUBSTRING_SETUP ; Y=DSCPNT, A=index
+			IFE A, 0  ; zero index requested
+                JMP FCERR ; illegal quantity error
+            SUB A, 1     ; convert 1-based index to 0-based offset
+            SET PUSH, A
+            SET X, 0
+            SUB A, 1     ; CLC 
+            SUB A, [Y]   ; SBC [[DSCPNT]]
+            IFE EX, 0 ; if start index > real string length
                 JMP ROMB70D 
-            XOR X, -1
-            IFU X, [RAM64]
-                SET X, [RAM64]
-:ROMB75F    JMP ROMB70E
-
-; special cases for MID$
-:ROMB70D    SET PUSH, A ; push starting index
-            IFE 1, 0
-:ROMB70E    SET PUSH, X ; push starting index
-            SET PUSH, Y
-            SET A, [RAM64]
-            JMP ROMB70F
+            XOR A, -1 ; get number of characters left after index
+            IFL A, [RAM64]     ; if fewer bytes left than requested 
+                JMP ROMB70E
+            SET A, [RAM64] 
+            JMP ROMB70E
 
 :ROMB39E    SET C, 1
             JSR PLOT
@@ -3243,7 +3260,7 @@
 ; get first 2 parameters for LEFT$/RIGHT$/MID$
 ; returns A as numeric parameter
 ; returns Y as pointer to string descriptor
-:PREAM
+:SUBSTRING_SETUP
 :ROMB761    JSR CHKCLS
             SET J, POP ; RTS address (was 2)
             SET A, POP ; discard - was 2
@@ -3270,7 +3287,7 @@
 :ASCN
 :ROMB78B    JSR GETSTR
             IFE A, 0
-                JMP ROMB248
+                JMP FCERR
             SET Y, [INDEX]
             SET A, [Y]
             JMP GIVAYF
@@ -3315,7 +3332,8 @@
 ; convert float to integer
 
 :GETADR
-:ROMB7F7    IFB [FACSGN], 0x80 ; negative number
+:ROMB7F7    
+        IFU [FACSGN], 0 ; negative number
             JMP FCERR
         IFG [FACEXP], 0x90 ; > 65535
             JMP FCERR ;illegal quantity
