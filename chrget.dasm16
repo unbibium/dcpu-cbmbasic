@@ -1,0 +1,42 @@
+;
+; This is an important subroutine that controls BASIC's execution
+; cursor, located ar [RAM7A].  Optimizing this will speed up
+; BASIC's execution time, so we want to make sure that this routine
+; is as tight as possible, and that the macros/defines at the bottom
+; are always used to handle the return values other than A.
+; 
+;  CHRGET: Move BASIC's execution cursor to next character, then
+;  CHRGOT: Read character at execution cursor into A
+;  RAM0080: ?
+;     returns:
+;  A contains the character or BASIC token fetched.
+;  A=0 for end of line
+;  C=0 for digits, C=1 for all other characters
+;  Z=1 for end of statement (i.e. null or ASCII colon)
+:CHRGET
+:RAM0073    ADD [RAM7A], 1
+:CHRGOT
+:RAM0079    DAT 0x7801 ;SET A, [next word]
+:TXTPTR
+:RAM7A      DAT 0x0800
+            SET C, 1
+            SET Z, 0
+            IFE A, CBM_COLON
+                SET Z, 1  ; return Z=1 for end of statement
+            IFG A, 0x39  ; Not a digit or space
+                RTS      ; return C=1
+:RAM0080    IFE A, CBM_SPACE ; Space
+            JMP CHRGET  ; skip to next character
+            SET C, 0
+            IFL A, 0x30  ; Is a digit
+:RAM008C        SET C, 1 ; C=1, is not a digit
+            IFE A, 0
+:RAM008Z        SET Z, 1
+            RTS
+
+; need better names for these
+.DEFINE IF_NEXT_STMT     IFN Z, 0
+.DEFINE IF_NOT_NEXT_STMT IFE Z, 0
+.DEFINE IF_NOT_DIGIT     IFN C, 0
+.DEFINE IF_IS_DIGIT      IFE C, 0
+

@@ -42,7 +42,7 @@ mostly like they do on the C64:
 * BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, ON,
                   NEW, STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT
 * BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$, ASC, EXP,
-                   SIN, COS, LOG, SPC
+                   SIN, COS, LOG, SPC, MID$
 * PETSCII control codes for color change, reverse text, cursor
   movement, and switching between graphics and lowercase character
   sets.  Quote mode allows control characters to be typed into
@@ -61,6 +61,12 @@ mostly like they do on the C64:
   * Integer variables like A%
 * Multi-dimensional arrays for all the above types
 * Garbage collection
+
+I've put some stub routines in unused commands for testing purposes:
+* LOAD will load an old chatbot program called ELIZA into memory.
+  You can then use RUN to execute it, or LIST to see the source code.
+* VERIFY will display a table that describes how program memory
+  is currently being used.
 
 Just about anything else won't work, and may even crash the machine.
 Here's what's missing, in the rough order of when I'm going to add it:
