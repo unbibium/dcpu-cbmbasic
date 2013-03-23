@@ -1637,8 +1637,7 @@
             IFN A, CBM_QUOTE 
                 JMP ROMABCE
             ; handle INPUT "PROMPT";A$
-:ROMABC3    IFG A, CBM_QUOTE
-                SET C, 1
+:ROMABC3    SET C, 1
             JSR STRTXT ; start consuming string
             SET A, 0x3B  ; semicolon
             JSR SYNCHR  ; finish consuming string
