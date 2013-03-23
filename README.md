@@ -61,6 +61,7 @@ mostly like they do on the C64:
   * Integer variables like A%
 * Multi-dimensional arrays for all the above types
 * Garbage collection
+* Functions (DEF FN)
 
 I've put some stub routines in unused commands for testing purposes:
 * LOAD will load an old chatbot program called ELIZA into memory.
@@ -70,7 +71,7 @@ I've put some stub routines in unused commands for testing purposes:
 
 Just about anything else won't work, and may even crash the machine.
 Here's what's missing, in the rough order of when I'm going to add it:
-* other functions (MID$, VAL, PEEK, POS, TAB)
+* other functions (VAL, PEEK, POS, TAB)
 * Program storage (LOAD, SAVE, VERIFY)
 * File access (OPEN, CLOSE, GET, GET#, INPUT#, PRINT#, CMD)
 * 32-bit division (currently the power operator
@@ -78,7 +79,6 @@ Here's what's missing, in the rough order of when I'm going to add it:
 * POKE, WAIT, and PEEK (I'll need to stabilize the memory map first)
 * More trigonometry (TAN, ATN)
 * Special variables ST, TI, TI$
-* Functions (DEF FN)
 * a few DCPU-specific uses, like using DIM to allocate memory
   for the SPED-3.
 * direct DCPU access with SYS, USR()
@@ -107,6 +107,8 @@ I've used the following online resources to make this work:
   more thoroughly.  You'll see chunks of comments pasted from here
   in the source.
   <http://www.pagetable.com/?p=46>
+* ELIZA source code in BASIC:
+  <http://everything2.com/title/ELIZA+source+code+in+BASIC>
 
 DISCLAIMER:
 

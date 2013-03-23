@@ -120,7 +120,8 @@
 ; debugging routine for garbage collector
 .MACRO GARBDEBUG(F)
             ;SET C, [GARBDISPLAY] 
-            ;SET [C], 0x7000+F
+            ;SET [C], 0x7000
+            ;ADD [C], F
             ;ADD [GARBDISPLAY], 1 
 .ENDMACRO
 :GARBDISPLAY  DAT SCREENMEM+64
@@ -184,7 +185,7 @@
             DAT STMT_LOAD
             DAT STMT_SAVE
             DAT STMT_VERIFY
-            DAT 0xB3B2
+            DAT STMT_DEF
             DAT STMT_POKE
             DAT STMT_PRINTN
             DAT STMT_PRINT
@@ -215,7 +216,7 @@
             DAT PEEKFUNC  ; peek
             DAT ROMB77C  ; len
             DAT STRD
-            DAT 0xB7AD
+            DAT VAL
             DAT ASCN
             DAT CHRD
             DAT LEFTD
@@ -560,7 +561,7 @@
                 RTS
 
 ; test for A bytes free on stack
-:GETSTK         
+:GETSTK
     ADD A, STACK+52
     IFG A, SP
         JMP OMERR
@@ -1638,7 +1639,7 @@
             ; handle INPUT "PROMPT";A$
 :ROMABC3    IFG A, CBM_QUOTE
                 SET C, 1
-            JSR ROMAEBD ; start consuming string
+            JSR STRTXT ; start consuming string
             SET A, 0x3B  ; semicolon
             JSR SYNCHR  ; finish consuming string
             JSR ROMAB21
@@ -1864,6 +1865,7 @@
             SET A, 1
             JSR GETSTK
             JSR EVAL ; get a single floating point number
+            GARBDEBUG(0)
             SET [OPMASK], 0
             ; 
 :ROMADB8    JSR CHRGOT
@@ -2049,8 +2051,9 @@
             SET C, 0
             IFG A, CBM_QUOTE-1 ; carry over from 6502 CMP above
                 SET C, 1 
-; remember to set carry bit before jumping here.
+; remember to set C before jumping here.
 ; this entry point consumes a string in quotes.
+:STRTXT
 :ROMAEBD    SET A, [RAM7A]
             ADD A, C
             JSR STRLIT
@@ -2075,6 +2078,11 @@
                 JMP FNDOER
 :ROMAEEA    IFG A, 0xB3 ; Token for a function or operator 
                 JMP ISFUN
+
+; ----------------------------------------------------------------------------
+; EVALUATE "(EXPRESSION)"
+; ----------------------------------------------------------------------------
+
 :PARCHK
 :ROMAEF1    JSR CHKOPN
             JSR FRMEVAL
@@ -2320,7 +2328,7 @@
 
 :ROMB07E    JSR CHKCOM 
 :STMT_DIM   SET [DIMFLG], A  ; DIMFLG to non-zero
-            JSR ROMB092
+            JSR PTRGET3
             JSR CHRGOT
             IF_NOT_NEXT_STMT
                 JMP ROMB07E
@@ -2330,10 +2338,11 @@
 ;get name and pointer to a variable.
 ; At the end, the cursor should be at the last character of 
 ; the variable name.
-; Returns pointer in Y (originally AY)
+; Returns pointer in I (originally AY)
 :PTRGET
 :ROMB08B    JSR CHRGOT
 :ROMB090    SET [DIMFLG], 0
+:PTRGET3
 :ROMB092    SET [VARNAM], A ; store first letter of variable
             ; throw SYNTAX if first character is not a letter.
             JSR CHRGOT
@@ -2701,21 +2710,68 @@
 :ROMB3AE    SET X, 0x1B ; UNDEF'D FUNCTION
                 JMP ERROR
 
-            
+:STMT_DEF
+			JSR FNC  ; set DEFPNT to function variable
+			JSR ERRDIR
+			JSR CHKOPN
+			SET [SUBFLG], 0x80
+			JSR PTRGET
+			JSR CHKNUM
+			JSR CHKCLS
+			SET A, BASIC_EQ_TOKEN
+			JSR SYNCHR
+			; push function definition
+			SET PUSH, 0
+			SET PUSH, [VARPNT] ; Pointer to argument variable
+            SET PUSH, [RAM7A]  ; Pointer to function definition
+            JSR DATAN
+            SET [RAM7A], I
+            SET I, [DEFPNT]
+            JMP L3250  ; pop and store function definition
 ; get function name
+:FNC
 :ROMB3E1    SET A, BASIC_FN_TOKEN ;FN
             JSR SYNCHR
-            XOR A, 0x80
+            BOR A, 0x80
             SET [SUBFLG], A
-            JSR ROMB092 ; within PTRGET.
-            SET [DEFPNT], A
+            JSR PTRGET3 ; within PTRGET.
+            SET [DEFPNT], I
             JMP CHKNUM ; check that term is numeric
+            ;and return
             
 ; expand FN call
 :FNDOER
-:ROMB3F4    ;JSR ROMB3E1
-            SET EX, 0xB3F4
-            JMP CRASH
+:ROMB3F4    JSR FNC
+			SET PUSH, [DEFPNT]
+			JSR PARCHK
+			JSR CHKNUM
+			SET Y, POP   ; got variable name
+			SET [DEFPNT], Y
+			SET X, [Y+1] ; get address of argument variable
+			IFE X, 0
+				JMP ROMB3AE ; UNDEF'D STATEMENT
+            SET [VARPNT], X
+            ; Push original value of arg variable
+            SET PUSH, [X+2]
+            SET PUSH, [X+1]
+            SET PUSH, [X]
+            ; Push current text cursor location
+            SET PUSH, [RAM7A]
+            SET [RAM7A], [Y]    ; move cursor to function definition
+			; Move argument value to argument variable
+            JSR STORE_FAC_AT_X_ROUNDED
+            SET PUSH, [VARPNT]
+            JSR FRMNUM
+            SET I, POP
+            SET [DEFPNT], I
+            JSR CHRGOT
+            IFN Z, 1
+            	JMP SNERR
+            SET [RAM7A], POP
+:L3250		STI [I], POP  ; originally 5 bytes
+            STI [I], POP
+            STI [I], POP
+			RTS
 :STRD
 :ROMB465    JSR CHKNUM ; arg must be numeric
             SET Y, FLOATSTR-1
@@ -2896,7 +2952,6 @@
             JMP ROMB544 ; compare next I
 ; check all scalar string pointers
 :ROMB54D    SET [DSCLEN], GARB_LG  ; bytes per variable
-            GARBDEBUG(0x32)
             SET I, [VARTAB]
 :ROMB559    IFE [ARYTAB], I
                 JMP ROMB566
@@ -2904,7 +2959,6 @@
             JMP ROMB559 ; compare next I
 ; check all array string pointers
 :ROMB566    SET [HIGHDS], I
-            GARBDEBUG(0x33)
             SET [DSCLEN], GARB_SM ; number of bytes
 :ROMB56E    SET I, [HIGHDS]
 :ROMB572    IFE [STREND], I
@@ -2929,8 +2983,7 @@
 ; PROCESS A SIMPLE VARIABLE
 ; ----------------------------------------------------------------------------
 :CHECK_SIMPLE_VARIABLE
-:ROMB5BD    GARBDEBUG(0x13)
-            SET A, [I]
+:ROMB5BD    SET A, [I]
             SET B, [I+1]
             ; check type bits in the name.
             IFB [I], 0x80  
@@ -2947,20 +3000,16 @@
 ; This needs to return I
 :CHECK_VARIABLE
 :ROMB5C7    SET Y, I
-            GARBDEBUG(0x16)
             IFE [Y], 0   ; If zero length
                 JMP CHECK_BUMP ; skip
-            GARBDEBUG(0x01)
             SET A, [Y+1]   ; Get pointer to string data
             IFL A, [FREETOP]  ; if it's in the area being searched
                 JMP ROMB5DC   ; then proceed
             JMP CHECK_BUMP    ; otherwise skip; it's already sorted
-:ROMB5DC    GARBDEBUG(0x02)  ; check b
-            IFG A, [LOWTR]
+:ROMB5DC    IFG A, [LOWTR]
                 JMP ROMB5E6
             JMP CHECK_BUMP
-:ROMB5E6    GARBDEBUG(0x03)  ; check c
-            SET [LOWTR], A
+:ROMB5E6    SET [LOWTR], A
             SET [DEFPNT], I
             SET [RAM55], [DSCLEN]
 ; ----------------------------------------------------------------------------
