@@ -2,9 +2,9 @@
 ;  KERNAL MAIN
 ;----------------
 
-; I used to use a FILL here but this made the hex dump too
-; large to paste into web forms.
-.DEFINE BASICMEMEND BASICMEM+38912
+; I'm leaving the last 1/16 of memory for machine language
+; programs, I guess.
+.DEFINE BASICMEMEND 0xEFFF
 
 ; PETSCII constants
 .DEFINE CBM_STOP 0x03
