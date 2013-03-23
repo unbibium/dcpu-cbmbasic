@@ -306,16 +306,12 @@
 :ROME6B6    JSR ROME8B3 ; move cursor to next line if 
                    ; at end of line -- X will equal old line number
             ADD [PNTR], 1
-:ROME6BB    IFL [LNMX], [PNTR]
+            IFL [LNMX], [PNTR]
                 JMP ROME6C1
             RTS
 :ROME6C1    ; this branch is for when you type past the maximum logical line length
             IFE [LNMX], (HW_COLS*ROWS_IN_LINE)-1
                 JMP ROME6F7  ; just move to next line
-            ;SET A, [AUTODN]
-            ;SET B, [TBLX]
-            ;SET C, [LNMX]
-            ;JMP CRASH
             IFN [AUTODN], 0  ; if typing and not just printing
                 JMP ROME967 ; insert blank line underneath
 :ROME6CD    SET X, [TBLX]  ; current row
@@ -466,7 +462,7 @@
             SET X, [TBLX] ; current line
 :ROME967    ADD X, 1
             SET A, [LDTB1+X]
-            IFC A, DL_UNLINKED ; LONE LINE
+            IFC A, DL_UNLINKED
                 JMP ROME967
             SET [RAM02A5], X ; RAM02A5 is first unlinked line
                              ; below initial X value.
@@ -474,6 +470,7 @@
                 JMP ROME981
             IFL X, HW_ROWS-1
                 JMP ROME981
+        
             JSR ROME8EA ; scroll the screen
             SET X, [RAM02A5]
             SUB X, 1
@@ -489,11 +486,9 @@
             IFE X, [RAM02A5]
                 JMP ROME9A6
             ; get address of start of line
-            SET A, X
-            MUL A, HW_COLS
-            ADD A, [HIBASE]
+            SET A, [PNT]
+            SUB A, HW_COLS
             SET [SCPNT], A
-            ; skipped setting of A
             JSR ROME9C8  ; Move line from SCPNT to PNT
             JMP ROME98F ; repeat with previous line
 
@@ -813,6 +808,9 @@
        SET PC, FONTLOOP2
     IFE STARTLOWER, 1
         JSR TOGGLEFONT
+    ; i hate the crossbar zero in a 4x8 font
+    ; this looks much better
+    SET [VISFONT+96], 0x3E63
     RTS
 
 :TOGGLEFONT
