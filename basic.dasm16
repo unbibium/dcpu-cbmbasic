@@ -44,14 +44,12 @@
 :TEMPPT DAT TEMPST
 :RAM17  ; Pointer to the address of the last string in the temporary string stack
 :LASTPT DAT 0
-:RAM18  DAT 0
 :RAM19 ; Descriptor stack for temporary strings
 :TEMPST
     .FILL 10 BLANK
 :TEMPSTEND
 :RAM22
 :INDEX  DAT BLANK, BLANK
-:RAM28  DAT BLANK
 ; Pointer to the start of BASIC program text
 :RAM2B  
 :TXTTAB DAT BASICMEM+1
@@ -121,9 +119,9 @@
 
 ; debugging routine for garbage collector
 .MACRO GARBDEBUG(F)
-            SET C, [GARBDISPLAY] 
-            SET [C], 0x7000+F
-            ADD [GARBDISPLAY], 1 
+            ;SET C, [GARBDISPLAY] 
+            ;SET [C], 0x7000+F
+            ;ADD [GARBDISPLAY], 1 
 .ENDMACRO
 :GARBDISPLAY  DAT SCREENMEM+64
 
@@ -679,8 +677,7 @@
 ; insert new line.
 :ROMA4ED    JSR SETPTRS ; clear variable memory
             JSR FIX_LINKS ; relink basic program
-            SET A, [RAM0200]
-            IFE A, 0   ; No text entered
+            IFE [RAM0200], 0   ; No text entered
                 JMP MAIN ; delete only; return to prompt
             ; Make room for new line by moving the rest
             ; of the program up
@@ -734,10 +731,6 @@
             IFE A, CBM_RETURN 
                 JMP ROMAACA ; mark end and return
             SET [RAM0200+X], A
-            ; copy line to top of screen for debugging
-            ;SET [SCREENMEM+X], A
-            ;AND [SCREENMEM+X], 0x003F
-            ;BOR [SCREENMEM+X], 0x5000
             ADD X, 1
             IFL X, HW_COLS*ROWS_IN_LINE
                 JMP ROMA562
@@ -2653,11 +2646,10 @@
 :ROMB34B    RTS
 
 ; fre(0)
-; currently doesn't really work due to garbage collection
 :ROMB37D    IFN [VALTYP], 0
                 JSR ROMB6A6  
             JSR GARBAG
-            SET A, [RAM33]
+            SET A, [FREETOP]
             SUB A, [STREND]
             JSR GIVAYF
             IFE [FACSGN], 0
