@@ -112,11 +112,10 @@
             ; the high byte of memory to this.
             SET I, LDTB1
             SET J, 0
-:LINCLRLOOP STI I, DL_UNLINKED ; DISCONNECTED
+:LINCLRLOOP STI [I], DL_UNLINKED
             IFN J, HW_ROWS+1
                 JMP LINCLRLOOP
-            SET I, -1 
-            SET X, HW_ROWS-1 ; ?
+            SET X, HW_ROWS-1
 :ROME560    JSR ROME9FF  ; clear one screen line
             SUB X, 1
             IFA X, -1 ; BPL
@@ -203,7 +202,7 @@
                 JMP ROME606
 :ROME60F    ADD Y, 1
             SET [INDX], Y ; mark end of logical line
-:ROME612    SET [AUTODN], 0 ;temporarily hold scrolling
+:ROME612    SET [AUTODN], 0 ; don't insert new lines when printing
             SET [PNTR],   0 ; beginning of line
             SET [QTSW],   0 ; turn off quote mode
             SET A, [LXSP] ; get column at start of input
@@ -227,7 +226,7 @@
 :ROME63A    SET Y, [PNTR]
             ADD Y, [PNT] ; Y <- current character location
             SET A, [Y]   ; A <- current character byte
-; TODO: handle RVS text somehow
+; TODO: handle RVS text better
             AND A, 0xFF
             SET [RAMD7], A
             AND A, 0x3F
@@ -275,7 +274,7 @@
                JMP ROME699
 :ROME697    SET X, [COLOR]
             SHL X, 4
-	    SET B, EX
+        SET B, EX
             SHL X, 4
             SET X, EX
             SHL X, 4
@@ -317,7 +316,7 @@
             ;SET B, [TBLX]
             ;SET C, [LNMX]
             ;JMP CRASH
-            IFN [AUTODN], 0  ; if scrolling enabled
+            IFN [AUTODN], 0  ; if typing and not just printing
                 JMP ROME967 ; insert blank line underneath
 :ROME6CD    SET X, [TBLX]  ; current row
             IFL X, HW_ROWS  
@@ -370,7 +369,7 @@
 ; action for RETURN
 :ROME891    SET [INSRT], 0
             SET [RVS], 0
-            SET [RAMD4], 0
+            SET [QTSW], 0
             SET [PNTR], 0 ; column 0
             JSR ROME87C ; Move cursor to next line
             JMP ROME6A8 ; Return from outputting
@@ -454,7 +453,7 @@
 :ROME938    ; todo: Test for CTRL key
 ; ...       
                JMP ROME956
-:ROME94B	SET X, 10000 ; how long to pause
+:ROME94B    SET X, 10000 ; how long to pause
 :ROME94D    SET X, X; ; NOP
             SUB X, 1;
             IFN X, 0
@@ -643,7 +642,7 @@
                 JMP ROME697  ; print reverse
 :ROME785    IFE A, 0x0E  ; lowercase mode
                 JSR TOLOWER
-			IFE A, 0x12  ; RVS code
+            IFE A, 0x12  ; RVS code
                 SET [RVS], A
             IFE A, CBM_HOME 
                 JSR ROME566
@@ -749,7 +748,7 @@
 
 :ROME84C    IFE A, 0x0E ; Uppercase mode
                 JSR TOUPPER
-			IFE A, 0x12 ; reverse off
+            IFE A, 0x12 ; reverse off
                 SET [RVS], 0
             IFN A, CBM_RIGHT ; cursor left
                 JMP ROME86A
