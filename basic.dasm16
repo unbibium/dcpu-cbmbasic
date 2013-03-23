@@ -1785,7 +1785,7 @@
 :STMT_NEXT
 :ROMAD1E    IF_NOT_NEXT_STMT
                 JMP ROMAD24
-            SET Y, 0     ; don't know which variable to advance
+            SET I, 0     ; don't know which variable to advance
             JMP ROMAD27
 :ROMAD24    JSR PTRGET   ; get variable to advance in I
 :ROMAD27    SET [FORPNT], I
@@ -2774,7 +2774,7 @@
 :STRD
 :ROMB465    JSR CHKNUM ; arg must be numeric
             SET Y, FLOATSTR-1
-            JSR FOUT1   ; FOUT+1
+            JSR FOUT1   ; FOUT starting at Y
             SET A, POP  ; originally 2x PLA
 :ROMB46F    SET A, FLOATSTR-1
             JMP STRLIT
