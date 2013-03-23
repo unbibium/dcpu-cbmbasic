@@ -3123,8 +3123,8 @@
             SUB A, 1     ; convert 1-based index to 0-based offset
             SET PUSH, A
             SET X, 0
-            SUB A, 1     ; CLC 
-            SUB A, [Y]   ; SBC [[DSCPNT]]
+            STI I, [Y]  ; I <- [Y]+1 
+            SUB A, I    ; SBC [[DSCPNT]]
             IFE EX, 0 ; if start index > real string length
                 JMP ROMB70D 
             XOR A, -1 ; get number of characters left after index
