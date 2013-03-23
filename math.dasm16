@@ -155,7 +155,7 @@
             SBX A, [X+1]
             SET [FACHO], A
             ; BCS B8D7, then JSR NEGFAC
-:ROMB8D2    IFE EX, -1 ; one borrow left to do
+:ROMB8D2    IFU EX, 0 ; one borrow left to do
                 JSR NEGFAC
 :ROMB8D7    SET Y, 0
 :ROMB8D9    SET A, Y
@@ -763,16 +763,13 @@
             SET [FACHO+1], 0
             SET X, 0x88      ; FAC < 128
 :ROMBC44 ; EX contains sign of number
-            SET EX, 0
-            IFU A, 0
-                SET EX, -1
+            SET EX, A
 ; Zero out rest of FACHO
 :ROMBC49
-            SET A, 0
             SET [FACEXP], X
-            SET [FACHO+1], A
-            SET [FACOV], A
-            SET [FACSGN], A
+            SET [FACHO+1], 0
+            SET [FACOV], 0
+            SET [FACSGN], 0
             JMP ROMB8D2
             ;... does a NEGFAC if EX = -1,
             ; then normalizes the thing
