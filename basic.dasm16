@@ -192,10 +192,10 @@
             DAT STMT_LIST
             DAT STMT_CLR
             DAT STMT_CMD
-            DAT 0xE129
-            DAT 0xE1BD
-            DAT 0xE1C6
-            DAT 0xAB7A
+            DAT 0xE129 ; sys
+            DAT 0xE1BD ; open
+            DAT 0xE1C6 ; close
+            DAT STMT_GET
             DAT STMT_NEW
 :FUNCTION_ROUTINES 
             DAT SGNFUNC ; sgn
@@ -571,15 +571,13 @@
 ; (A) = ADDR ARRAYS NEED TO GROW TO
 ; ----------------------------------------------------------------------------
 :REASON
-:ROMA408    IFL A, [FREETOP]      ; CPY $34
-:ROMA40A        RTS       ; BCC $A434
-                SET PUSH, A
-:ROMA416        SET PUSH, Y
-:ROMA41C        JSR GARBAG
-:ROMA427        SET Y, POP
-:ROMA429        SET A, POP
+:ROMA408    IFL A, [FREETOP]
+                RTS
+            SET PUSH, A
+            JSR GARBAG
+            SET A, POP
             ; garbage collection not enough?
-:ROMA42A    IFG A, [FREETOP]
+            IFG A, [FREETOP]
                 JMP OMERR
 :ROMA434    RTS
 
@@ -595,7 +593,7 @@
              JSR CLRCHN
              SET [CHANNL], 0
 :ROMA44E     JSR ROMAAD7 ; end line on CMD
-:ROMA451     JSR ROMAB45
+:ROMA451     JSR OUTQUES
              SET Z, [INDEX]   ; LDY #$00
 :ROMA456     SET A, [Z]       ; LDA ($22),Y
              SET PUSH, A      ; PHA
@@ -1478,7 +1476,7 @@
             JSR FOUT    ; convert float to string
             JSR STRLIT  ; prepare string in memory
             JSR ROMAB21 ; print string in [INDEX]
-            JSR ROMAB3B ; print space ?
+            JSR OUTSP ; print space ?
             JMP ROMAA9D  ; was a BNE, probably unconditional
             
 ; zero-terminate this string
@@ -1534,7 +1532,7 @@
             ; handle semicolon
 :ROMAB13    JSR CHRGET
             JMP ROMAAA2
-:ROMAB19    JSR ROMAB3B ; what does this return?
+:ROMAB19    JSR OUTSP ; print space. what does it return?
             IFN A, 0
                 JMP ROMAB10
 
@@ -1564,38 +1562,62 @@
 ; print character on CMD output file
 ; calling functions should check A instead of Z
 
+:OUTSP
 :ROMAB3B    IFE [CHANNL], 0
                 JMP ROMAB42
 :ROMAB3F    SET A, 0x20   ; space
             IFE A, -1 ; skip next
 :ROMAB42    SET A, CBM_RIGHT   
             IFE A, -1 ; skip next
+:OUTQUES
 :ROMAB45    SET A, 0x3F  ; question mark
 :ROMAB47    JMP ROME10C
 
-; Read errors
-
-:DOAGIN
+; ----------------------------------------------------------------------------
+; INPUT CONVERSION ERROR:  ILLEGAL CHARACTER
+; IN NUMERIC FIELD.  MUST DISTINGUISH
+; BETWEEN INPUT, READ, AND GET
+; ----------------------------------------------------------------------------
+:INPUTERR
 :ROMAB4D    SET A, [INPFLG]
             IFE A, INF_INPUT   ;0
-                JMP ROMAB62
+                JMP RESPERR
             IFE A, INF_READ
                 JMP ROMAB57
-            SET Y, -1
+            SET Y, -1        ; GET
             JMP ROMAB5B
 :ROMAB57    SET A, [DATLIN]
 :ROMAB5B    SET [CURLIN], A ; Report error from other line.
             JMP SNERR
-:ROMAB62    IFE [CHANNL], 0
-                JMP ROMAB6B
+:RESPERR    IFE [CHANNL], 0   ; keyboard
+                JMP ROMAB6B   ; ask for REDO
             SET X, 0x18 ; ?FILE DATA ERROR
             JMP ERROR
 
 ; ?REDO FROM START          
-:ROMAB6B    SET A, ROMAD0C
+:ROMAB6B    SET A, REDOMSG
             JSR STROUT
             SET [RAM7A], [OLDTXT]
             RTS
+
+:STMT_GET
+			JSR ERRDIR  ; program use only
+			IFN A, 0x23 ; GET#
+			    JMP LC486
+			JSR CHRGET
+			JSR GETBYT
+			SET A, CBM_COMMA
+			JSR SYNCHR
+			JSR CHKIN
+			SET [CHANNL], X
+:LC486		SET X, RAM0200+1
+			SET [X], 0
+			SET A, INF_GET
+			JSR PROCESS_INPUT_LIST
+			SET X, [CHANNL]
+			IFN X, 0
+			    JMP ROMABB7
+			RTS 
 
 :STMT_INPUTN
 :ROMABA5    JSR GETBYT
@@ -1605,7 +1627,7 @@
             JSR ROME11E   ; CHKIN
             JSR ROMABCE   ; go to main INPUT subroutine
 :ROMABB5    SET A, [CHANNL]
-            JSR ROMFFCC
+:ROMABB7    JSR ROMFFCC   ; clear
             SET [CHANNL], X
             RTS
 
@@ -1624,8 +1646,7 @@
 :ROMABD1    SET A, CBM_COMMA
             SET [RAM01FF], A
 :ROMABD6    JSR ROMABF9 ; get line into input buffer
-            SET A, [CHANNL]
-            IFE A, 0
+            IFE [CHANNL], 0
                 JMP ROMABEA
 :ROMABDD    JSR ROMFFB7    ; get status
             AND A, 2
@@ -1633,35 +1654,42 @@
                 JMP ROMABEA
             JSR ROMABB5
             JMP STMT_DATA ; jump to end of statement
-:ROMABEA    SET A, [RAM0200]
-            IFN A, 0
-                JMP ROMAC0D ; pass X as input buffer start
-            SET A, [CHANNL]
-            IFN A, 0
+:ROMABEA    SET A, INF_INPUT
+            IFN [RAM0200], 0
+                JMP PROCESS_INPUT_LIST ; pass X as input buffer start
+            IFN [CHANNL], 0
                 JMP ROMABD6
             JSR DATAN ; get end of line in I
             JMP ROMA8FB ; ... = I, next statement.
 
 ; get line into input buffer
-:ROMABF9    IFN [RAM13], 0
-                JMP ROMAC03
-            JSR ROMAB45 ; print question mark
-            JSR ROMAB3B
+:ROMABF9    IFN [CHANNL], 0
+                JMP INLIN
+            JSR OUTQUES ; print question mark
+            JSR OUTSP   ; print space
 :ROMAC03    JMP INLIN
 
 :STMT_READ
 :ROMAC06    SET X, [DATPTR]
-            SET [INPFLG], INF_READ 
-            IFE X, 0 ; skip next
-:ROMAC0D    SET [INPFLG], 0 ; INPUT command entry
+            SET A, INF_READ 
+
+; ----------------------------------------------------------------------------
+; PROCESS INPUT LIST
+;
+; (X) IS ADDRESS OF INPUT DATA STRING
+; (A) = VALUE FOR INPUTFLG
+; ----------------------------------------------------------------------------
+:PROCESS_INPUT_LIST
+:ROMAC0D    SET [INPFLG], A ; INPUT command entry
             SET [INPPTR], X ; start search position
+:PROCESS_INPUT_ITEM
 :ROMAC15    JSR PTRGET  ; get variable pointer as I
             SET [FORPNT], I  ; we use FORPNT for assignments
             SET [OPPTR], [RAM7A]
             SET [RAM7A], [INPPTR] ; move cursor to reading location
             JSR CHRGOT
             IF_NOT_NEXT_STMT
-                JMP ROMAC51
+                JMP INSTART
             IFN [INPFLG], INF_GET ; BVC
                 JMP ROMAC41
             JSR ROME124 ; get one character
@@ -1672,9 +1700,10 @@
                 JMP ROMACB8
             IFN [CHANNL], 0
                 JMP [ROMAC4A]
-            JSR ROMAB45 ; print question mark
+            JSR OUTQUES ; print question mark
 :ROMAC4A    JSR ROMABF9 ; get line into input buffer
 :ROMAC4D    SET [RAM7A], X
+:INSTART
 :ROMAC51    JSR CHRGET
             IFA [VALTYP], -1 ; Numeric
                 JMP ROMAC89
@@ -1685,45 +1714,46 @@
             SET [RAM07], A
             JMP ROMAC71
 :ROMAC65    SET [RAM07], A
-            SET C, 1 ; add 1 to address if quote matches
+            SET EX, 1 ; add 1 to address if quote matches
             IFE A, CBM_QUOTE
                 JMP ROMAC72
             SET [RAM07], CBM_COLON
             SET A, CBM_COMMA
-:ROMAC71    SET C, 0
+:ROMAC71    SET EX, 0
 :ROMAC72    SET [ENDCHR], A
             SET A, [RAM7A]
-            ADD A, C
+            ADD A, EX
             JSR STRLT2  ; STRLIT for unquoted string
-            JSR ROMB7E2 ; move cursor to after string
+            SET [RAM7A], [RAM71] ; move cursor to after string
             JSR ROMA9DA ; assign to a string variable
-            JMP ROMAC91 ; handle any extra
+            JMP INPUT_MORE ; handle any extra
 :ROMAC89    JSR FIN ; convert string to float
             SET A, [INTFLG]
             JSR ROMA9C2 ; assign to float or integer.
+:INPUT_MORE
 :ROMAC91    JSR CHRGOT
             IF_NEXT_STMT
                 JMP ROMAC9D
             IFE A, CBM_COMMA ; end of variable
                 JMP ROMAC9D
-            JMP DOAGIN ; process input errors
+            JMP INPUTERR ; process input errors
 :ROMAC9D    SET [INPPTR], [RAM7A]
             SET [RAM7A], [OPPTR] ; return cursor to program listing
             JSR CHRGOT
             IF_NEXT_STMT
-                JMP ROMACDF  ; no more variables in statement
-            JSR CHKCOM       ; OR, comma
-            JMP ROMAC15      ; followed by another variable
+                JMP INPDONE  ; no more variables in statement
+            JSR CHKCOM              ; OR, comma
+            JMP PROCESS_INPUT_ITEM  ; followed by another variable
 ; find next DATA statement
 :ROMACB8    JSR DATAN ; get next statement in I
 ; todo: finish this I pointer's trek through the program
             ADD I, 1 
             IFN A, 0
                 JMP ROMACD1
-:ROMACBF    SET X, 0x0D ; error number
+:ROMACBF    SET X, 0x0D ; ?OUT OF DATA
             ADD I, 1
             IFE [I], 0 ; no next line?
-                JMP ERROR ; throw ?OUT OF DATA
+                JMP ERROR ; throw
             ADD I, 1
             SET [DATLIN], [I]
 :ROMACD1    SET [RAM7A], I
@@ -1731,7 +1761,9 @@
             SET X, A
             IFN X, BASIC_DATA_TOKEN ; DATA code
                 JMP ROMACB8
-            JMP ROMAC51
+            JMP INSTART
+; ---NO MORE INPUT REQUESTED------
+:INPDONE
 :ROMACDF    SET A, [INPPTR]
             IFE [INPFLG], INF_READ ; bpl
                 JMP ROMA827 ; set next line's data stmt
@@ -1753,7 +1785,6 @@
 :STMT_NEXT
 :ROMAD1E    IF_NOT_NEXT_STMT
                 JMP ROMAD24
- GARBDEBUG(63)
             SET Y, 0     ; don't know which variable to advance
             JMP ROMAD27
 :ROMAD24    JSR PTRGET   ; get variable to advance in I
@@ -2023,8 +2054,8 @@
 :ROMAEBD    SET A, [RAM7A]
             ADD A, C
             JSR STRLIT
-            JMP ROMB7E2  ; move RAM7A cursor to AFTER string
-             ; and return.
+            SET [RAM7A], [RAM71] ; move cursor to after string
+            RTS
             ;not a digit, variable, pi, string, or */-
 :ROMAECC    IFN A, BASIC_NOT_TOKEN
                 JMP ROMAEE3
