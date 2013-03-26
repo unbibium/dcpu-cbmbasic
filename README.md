@@ -42,7 +42,7 @@ mostly like they do on the C64:
 * BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, ON,
                   NEW, STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT
 * BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$, ASC, EXP,
-                   SIN, COS, LOG, SPC, MID$
+                   SIN, COS, LOG, SPC, MID$, STR$
 * PETSCII control codes for color change, reverse text, cursor
   movement, and switching between graphics and lowercase character
   sets.  Quote mode allows control characters to be typed into
