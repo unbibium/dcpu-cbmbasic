@@ -26,6 +26,8 @@
 :RAM62   ; Mantissa (32-bit)
 :FACHO DAT 0
 :RAM64 DAT 0
+:FACOV  ;low order mantissa byte for rounding
+:RAM70  DAT 0
 :FACSGN
 :RAM66 DAT 0
 
@@ -46,8 +48,6 @@
 :ARISGN ; Result of signed comparison
 :SGNCPR
 :RAM6F  DAT 0
-:FACOV  ;low order mantissa byte for rounding
-:RAM70  DAT 0
 ;
 ; Multiplication result - denormalized.
 :RESHO 
@@ -106,6 +106,7 @@
             SET [ARGOV], [FACOV] 
             SET X, ARGEXP ;  pointer
             SET A, [X]    ; A = actual exponent
+:FADD2
 :ROMB877    SET Y, A
             IFE Y, 0 ; FAC + O = FAC
                 RTS  ; so return FAC
@@ -116,7 +117,7 @@
                 JMP ROMB893
 :ROMB881    SET [FACEXP], Y ; Store larger exponent
             SET [FACSGN], [ARGSGN] 
-            SET [BITS], 0  ; had to add this for some rsn
+            ;SET [BITS], 0  ; had to add this for some rsn
             XOR A, 0xFFFF
             ADD A, 1       ; ADC #$00 after a subtract
             SET [ARGOV], 0
@@ -137,47 +138,58 @@
             SET C, 0
             SHR [X+1], 1 ; shift mantissa to the right
             ; X-thing is no longer normalized
-            JSR ROMB9B0 ; Finish shifting right 
+            JSR SHIFT_RIGHT4 ; Finish shifting right 
+:FADD3
 :ROMB8A3    IFA [SGNCPR], -1 ; result positive
-                JMP NORMAL ; add mantissae and normalize
-:FADD4  ; make the result negative if a borrow was done
+                JMP FADD4 ; add mantissae and normalize
+  ; make the result negative if a borrow was done
 :ROMB8A7    ; set Y to the other accumulator
             SET Y, FACEXP
             IFN X, ARGEXP
                 SET Y, ARGEXP
-:ROMB8AF    SET A, [ARGOV]    ; are these two in the right order?
-            SUB A, [FACOV]
-            SET [FACOV], A
+:ROMB8AF    SET EX, 1
+			XOR A, -1
+			ADX A, [ARGOV]
+			SET [FACOV], A
             SET A, [Y+2]
             SBX A, [X+2]
             SET [FACHO+1], A
             SET A, [Y+1]
             SBX A, [X+1]
             SET [FACHO], A
-            ; BCS B8D7, then JSR NEGFAC
+            ; BCS B8D7, then JSR COMPLEMENT_FAC
+; ----------------------------------------------------------------------------
+; NORMALIZE VALUE IN FAC
+; ----------------------------------------------------------------------------
+:NORMALIZE_FAC1
 :ROMB8D2    IFU EX, 0 ; one borrow left to do
-                JSR NEGFAC
+                JSR COMPLEMENT_FAC
+:NORMALIZE_FAC2
 :ROMB8D7    SET Y, 0
 :ROMB8D9    SET A, Y
 :ROMB8DA    SET C, 0
 :ROMB8DB    ; if highest 8 bits of mantissa are
             ; clear, we shift them left here.
             IFB [FACHO], 0xFF00   ; any bits set
-                JMP ROMB929  ; skip to single-bit
+                JMP NORMALIZE_FAC4  ; skip to single-bit
 :ROMB8DF    SHL [FACHO], 8
             SHL [FACHO+1], 8
             BOR [FACHO], EX
             SHL [FACOV], 8
             BOR [FACHO+1], EX
-            SET [FACOV], Y
+            ;SHL Y, 8
+            ;BOR [FACOV], Y
             ADD A, 8
-            IFN A, 32  ; we've tried moving 32 bits
-                JMP ROMB8DB  ; give up, return 0
+            IFN A, 32  
+                JMP ROMB8DB
+        	; we've tried moving 32 bits  
+            ; give up, return 0
+:ZERO_FAC
 :ROMB8F7    SET [FACEXP], 0
             SET [FACSGN], 0
             SET Z, 1
             RTS
-:NORMAL ; add fractions then normalize 
+:FADD4 ; add fractions then normalize 
 ; At this point the routine at B999 has
 ; brought the mantissa in ARGHO to the same
 ; exponent as FACHO, so we can add them here.
@@ -192,19 +204,21 @@
             JMP ROMB938 ; Increase exponent to make room
             
 ; postshift
+:NORMALIZE_FAC3
 :ROMB91D    ADD A, 1
             SHL [FACHO], 1
             SHL [FACHO+1], 1
             BOR [FACHO], EX
             SHL [FACOV], 1
             BOR [FACHO+1], EX
+:NORMALIZE_FAC4
 :ROMB929    IFC [FACHO], 0x8000   
                 JMP ROMB91D
             ; mantissa is normalized
 :ROMB92B    SUB A, [FACEXP]
             AND A, 0xFF
 :ROMB92E    IFE EX, 0 ; no borrow involved
-                JMP ROMB8F7 ; zero FACEXP and FACSGN, return
+                JMP ZERO_FAC ; zero FACEXP and FACSGN, return
 :ROMB930    XOR A, -1
             ADD A, 1
             AND A, 0xFF
@@ -228,9 +242,11 @@
             ;IFN C, 0
                 BOR [FACHO], 0x8000
             RTS
-            
+
+:COMPLEMENT_FAC           
 :NEGFAC ; replace FAC1 with its 2s-complement
 :ROMB947    XOR [FACSGN], -1 
+:COMPLEMENT_FAC_MANTISSA
 :ROMB94D    XOR [FACHO], -1
             XOR [FACHO+1], -1
             XOR [FACOV], 0xFFFF
@@ -248,6 +264,34 @@
 :ROMB97E
             SET X, 0x0F
             JMP ERROR
+
+   ; 01 too many files
+   ; 02 file open
+   ; 03 file not open
+   ; 04 file not found
+   ; 05 device not present
+; debugging help
+:OVERR1 ; too many files
+	SET X, 1
+	JMP ERROR
+:OVERR2 ; file open
+	SET X, 2
+	JMP ERROR
+:OVERR3 ; too many files
+	SET X, 3
+	JMP ERROR
+:OVERR4 ; file open
+	SET X, 4
+	JMP ERROR
+:OVERR5 ; file open
+	SET X, 5
+	JMP ERROR
+:OVERR6 ; file open
+	SET X, 6
+	JMP ERROR
+:OVERR7 ; file open
+	SET X, 7
+	JMP ERROR
 
 ; I think this routine inserts a byte at the beginning
 ; of the mantissa, using BITS as a high overflow byte.
@@ -289,13 +333,13 @@
 :ROMB9AE    SHR [X+1], 1
             BOR [X+1], C 
             ; might jump here if X+1 is already shifted
+:SHIFT_RIGHT4
 :ROMB9B0    SET C, EX
-            SHR [X+2], 1
-            
+            SHR [X+2], 1          
 :ROMB9B0A   BOR [X+2], C
 :ROMB9B6    SET C, EX
-            SHR A, 1
-            BOR A, C
+            SHR A, 1   ; overflow byte
+            BOR A, C   ; etc
             
 :ROMB9B7    ADD Y, 1    ; add one to exponent diff
             IFB Y, 0x00FF  ; low bits not equal 0
@@ -330,7 +374,11 @@
 :ROMB9E0  DAT 0x80,0x8000,0x0000   ; -1/2
 :CON_LOG_TWO
 :ROMB9E5  DAT 0x80,0x3172,0x17F8   ; LOG(2)
+:CON_INVSQRT
+          DAT 0x5F, 0x3759, 0xDF00 ; magic number
 
+; for double it's 0x5fe6eb50c7b537a9
+; see http://www.lomont.org/Math/Papers/2003/InvSqrt.pdf
 
 ; FAC1 <- ln FAC1
 :LOG
@@ -352,7 +400,7 @@
         SET A, CON_NEG_HALF
         JSR FADD
         SET A, POP  ; retrieve log 2 of FAC
-        JSR FINLOG  
+        JSR ADDACC  
         SET A, CON_LOG_TWO
         ; fall through to FMULT
 
@@ -420,7 +468,7 @@
             IFC A, 0x100 ; BCC
                 JMP ROMBAC4
             IFB A, 0x80  ; BMI but carry set
-                JMP OVERR  ; originally BADF
+                JMP OVERR
 :ROMBAC2    AND A, 0xFF ; CLC
             JMP ROMBAC6  ; .BY $2C to jump next BPL 
 :ROMBAC4    IFC A, 0x80 ; BPL
@@ -446,7 +494,7 @@
 ; pop return address and set FAC=0
 :ZERO
 :ROMBADA    SET A, POP ; don't return to FMULT/FDIV.
-            JMP ROMB8F7 ; zero FACEXP and FACSGN
+            JMP ZERO_FAC ; zero FACEXP and FACSGN
 
 ; This quick-multiplies FAC by 10 through bit shifting
 ; and addition.
@@ -458,7 +506,7 @@
             IFB A, 0x100
                 JMP OVERR
 :ROMBAED    SET [SGNCPR], 0
-            JSR ROMB877  ; FAC += ARG
+            JSR FADD2  ; FAC += ARG
             ADD [FACEXP], 1  ; FAC *= 2
             IFB [FACEXP], 0x100
                 JMP OVERR
@@ -518,7 +566,7 @@
         ADX [FACOV], Y
         ADX [FACHO+1], 0
         ADX [FACHO], 0
-        JMP ROMB8D7 ; normalize
+        JMP NORMALIZE_FAC2 ; normalize
 
 ; FAC <- FAC / ARG
 :DIV
@@ -587,7 +635,7 @@
             DIV Y, X    ; ARGHO = ARGHO / FACHO
             SET [FACHO+1], EX
             SET [FACHO], Y
-            JMP ROMB8D7
+            JMP NORMALIZE_FAC2
 
             SET X, EX   ; X = right of decimal point
 
@@ -654,7 +702,7 @@
             JMP ERROR
 :ROMBB8F    SET [FACHO], [RESHO]
             SET [FACHO+1], [RESHO+1]
-            JMP ROMB8D7 ; normalize before returning
+            JMP NORMALIZE_FAC2 ; normalize before returning
             
     
 
@@ -753,15 +801,17 @@
 :ROMB391    SET [VALTYP], 0   ; numeric
             SET [FACHO], A
             SET X, 0x90 ; FAC < 32768
-            JMP ROMBC44 ; normalize
+            JMP FLOAT1 ; normalize
             
 ; Move signed 8-bit number from A into float
 
+:FLOAT
 :ROMBC3C
             SHL A, 8
             SET [FACHO], A ; Mantissa
             SET [FACHO+1], 0
             SET X, 0x88      ; FAC < 128
+:FLOAT1
 :ROMBC44 ; EX contains sign of number
             SET EX, A
 ; Zero out rest of FACHO
@@ -770,8 +820,8 @@
             SET [FACHO+1], 0
             SET [FACOV], 0
             SET [FACSGN], 0
-            JMP ROMB8D2
-            ;... does a NEGFAC if EX = -1,
+            JMP NORMALIZE_FAC1
+            ;... does a COMPLEMENT_FAC if EX = -1,
             ; then normalizes the thing
 
 ; ABS FUNCTION
@@ -840,25 +890,26 @@
 :QINT
 :ROMBC9B    SET A, [FACEXP]
             IFE A, 0
-                JMP ROMBCE9 ; clear mantissa and return
+                JMP QINT3 ; clear mantissa and return
 :ROMBC9F    SUB A, 0xA0
             IFA [FACSGN], -1
                 JMP ROMBCAF ; skip two lines if positive
             SET [BITS], -1  ; shift 1s from the left instead of 0s
-            JSR ROMB94D  ; multiply mantissa by -1
+            JSR COMPLEMENT_FAC_MANTISSA
 :ROMBCAF    SET X, FACEXP ; pointer to MULSHF operand
-            IFG A, -8   ; CMP 0xF9
-                JMP ROMBCBB
+            IFA A, -8   ; CMP 0xF9
+                JMP QINT2
             JSR SHIFT_RIGHT  ; shift by 8 bits
             SET [BITS], 0
 :ROMBCBA    RTS
-            
+
+:QINT2
 :ROMBCBB    SET Y, A
             SET A, [FACSGN]
             AND A, 0x8000
             SHR [FACHO], 1
             BOR [FACHO], A
-            JSR ROMB9B0 ; shift rest of FACHO to the right
+            JSR SHIFT_RIGHT4 ; shift rest of FACHO to the right
             SET [BITS], 0
 :ROMBCCB    RTS
 
@@ -873,8 +924,9 @@
             SET [FACSGN], 0
             SET [FACEXP], 0xA0 ; exponent is 2**32
             SET [RAM07], [RAM64]
-            JMP ROMB8D2 ; re-normalize
-                
+            JMP NORMALIZE_FAC1 ; re-normalize
+ 
+:QINT3               
 :ROMBCE9    SET [FACHO], 0
             SET [FACHO+1], 0
             RTS
@@ -892,27 +944,26 @@
             SET [FACHO+1], 0
             SET [FACSGN], 0
             ; parse result from last CHRGET
-            IFE C, 0
-                JMP ROMBD6A ; is a digit
-            IFN A, 0x2D ; minus
-                JMP ROMBD06
-            SET X, -1
-:ROMBD02    SET [SGNFLG], X  ; is a positive number
+            IF_IS_DIGIT
+                JMP FIN9
+            IFE A, 0x2D ; minus
+                SET X, -1
+            SET [SGNFLG], X
 :ROMBD06    IFN A, 0x2B ; plus sign
                 JMP ROMBD0F 
             ; get digit after +/-
 :ROMBD0A    JSR CHRGET
             ; parse a digit
-:ROMBD0D    IFE C, 0    ; is a digit
-                JMP ROMBD6A
+:ROMBD0D    IF_IS_DIGIT
+                JMP FIN9
 :ROMBD0F    IFE A, 0x2E ; decimal point
                 JMP ROMBD41
             IFN A, 0x45 ; E
                 JMP ROMBD47
             ; handle exponent notation
             JSR CHRGET
-            IFE C, 0  ; is a digit
-                JMP ROMBD91
+            IF_IS_DIGIT
+                JMP GETEXP
             IFE A, BASIC_MINUS_TOKEN
                 JMP ROMBD2E
             IFE A, 0x2D  ; minus
@@ -925,8 +976,8 @@
             ; handle negative exponent
 :ROMBD2E    SET [RAM60], -1
 :ROMBD30    JSR CHRGET
-            IFE C, 0 ; is a digit?
-                JMP ROMBD91
+            IF_IS_DIGIT
+                JMP GETEXP
 :ROMBD35    IFN [RAM60], -1 ; bpl
                 JMP ROMBD47
             SET A, 0
@@ -962,21 +1013,23 @@
                 JSR NEGOP ; originally via BD67
             RTS
 ; handle a digit
+:FIN9
 :ROMBD6A    SET PUSH, A
             IFB [DECFLG], 0x8000 ; after a decimal point
                 ADD [DECEXP], 1 ; increase decimal exponent
             JSR MUL10  ; multiply decimal mantissa regardless
             SET A, POP
             SUB A, 0x30 ; zero
-            JSR FINLOG  ; add contents of digit
+            JSR ADDACC  ; add contents of digit
             JMP ROMBD0A ; go to next character
             
-; Add signed integer from A to float accu
+; Add A to FAC
 :FINLOG
+:ADDACC
 :ROMBD7E    SET PUSH, A
             JSR MOVAF ; ARG = FAC
             SET A, POP
-            JSR ROMBC3C  ; move A into FAC
+            JSR FLOAT  ; move A into FAC
             
             SET A, [ARGSGN]
             XOR A, [FACSGN]
@@ -986,6 +1039,7 @@
             JMP FADDT
 
 ; get E+xx/E-xx exponent from string
+:GETEXP
 :ROMBD91    SET A, [RAM5E] ; number of received digits
             IFL A, 10
                 JMP ROMBDA0
@@ -1004,11 +1058,10 @@
             SET [RAM5E], A
             JMP ROMBD30 ; get next expodigit
             
-:NO999
 ; constants for float to string conversion
-:ROMBDB3   DAT 0x9B, 0x3EBC, 0x1FFD
-:ROMBDB8   DAT 0x9E, 0x6E6B, 0x27FD
-:ROMBDBD   DAT 0x9E, 0x6E6B, 0x2800
+:CON_99999999_9   DAT 0x9B, 0x3EBC, 0x1FFD
+:CON_999999999    DAT 0x9E, 0x6E6B, 0x27FD
+:CON_BILLION      DAT 0x9E, 0x6E6B, 0x2800
 
 
 ; print "IN <line>"
@@ -1022,7 +1075,7 @@
 :LINPRT
 :ROMBDCD    SET [FACHO], A
             SET X, 0x90 ;  exponent = 2^16
-            SET EX, 0 ; don't run NEGFAC from B8D2
+            SET EX, 0 ; don't run COMPLEMENT_FAC from B8D2
             JSR ROMBC49  ; normalize this
             SET Y, FLOATSTR ; Cut off initial space
             JSR FOUT1     ; convert float to string
@@ -1054,17 +1107,17 @@
             IFG X, 0x80 ; number > 1
                 JMP ROMBE09
 ; For numbers between 0 and 1, we skip 9 digits
-:ROMBE00    SET A, ROMBDBD  ;  1,000,000,000
+:ROMBE00    SET A, CON_BILLION  ;  1,000,000,000
             JSR FMULT 
             SET A, -9 ; signify we've moved the decimal point
 :ROMBE09    SET [DECEXP], A
-:ROMBE0B    SET A, ROMBDB8
+:ROMBE0B    SET A, CON_999999999
             JSR FCOMP 
 :ROMBE12    IFE A, 0  ; FAC1 = 999,999,999.5
                 JMP ROMBE32
             IFC A, 0x8000 ; FAC1 > 999,999,999.5
                 JMP ROMBE28 
-:ROMBE16    SET A, ROMBDB3
+:ROMBE16    SET A, CON_99999999_9
             JSR FCOMP
 :ROMBE1D    IFE A, 0 ; fac1 = 99,999,999.5
                 JMP ROMBE21 ; squeeze one more out
@@ -1219,12 +1272,21 @@
     DAT 0x0000,0x003C ;      60         :01 (1 second = 60 jiffies)
 :FDCENDEND
 
+; ----------------------------------------------------------------------------
+; special case for X^2
+; ----------------------------------------------------------------------------
+:SQUARE
+		JSR MOVFA  ; FAC <- ARG
+		SET [ARISGN], 0
+		JMP FMULTT
+; ----------------------------------------------------------------------------
+; SQR(X) = X^0.5
+; ----------------------------------------------------------------------------
 :SQR
         JSR MOVAF
         SET A, CON_HALF
         JSR MOVFM
         ; fall through to FPWRT
-
 ; ----------------------------------------------------------------------------
 ; EXPONENTIATION OPERATION
 ;
@@ -1233,9 +1295,13 @@
 :FPWRT
 :ROMBF7B    IFE A, 0  ; ???
                 JMP EXP
-            SET A, [ARGEXP]
-            IFE A, 0
-                JMP ROMB8F7 ; return 0
+            IFE [ARGEXP], 0
+                JMP ZERO_FAC ; return 0
+			; special case for squares
+            IFE A, 0x82
+                IFE [FACHO+1], 0
+                	IFE [FACHO], 0x8000
+                		JMP SQUARE
             SET Y, 0
             SET X, FACTEMP3
             JSR STORE_FAC_AT_X_ROUNDED 
@@ -1413,7 +1479,7 @@
 :ROME0E3    SET [FACSGN], 0
             SET [FACOV], [FACEXP]
             SET [FACEXP], 0x80 ; LET FAC < 1
-            JSR ROMB8D7 ; Normalize
+            JSR NORMALIZE_FAC2 ; Normalize
             SET X, RNDX
 :ROME0F6    JMP STORE_FAC_AT_X_ROUNDED 
 
