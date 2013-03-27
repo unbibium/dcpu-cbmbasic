@@ -296,43 +296,38 @@
 ; I think this routine inserts a byte at the beginning
 ; of the mantissa, using BITS as a high overflow byte.
 :MULSHF 
+:SHIFT_RIGHT1
 :ROMB983   SET X, RESHO-1 ; RESHO has no exponent
             ; shift 8 bits from
-           ; low $68 -> mantissa -> high $70
-:ROMB985    SHR [X+2], 8
-            SET [FACOV], EX
+           ; [BITS] -> mantissa -> [FACOV]
+:SHIFT_RIGHT2
+:ROMB985    SHR [FACOV], 8
+            SHR [X+2], 8
+            BOR [FACOV], EX
             SHR [X+1], 8
             BOR [X+2], EX
             ASR [BITS], 8
-            SET Y, [BITS]
-            ASR Y, 8 ; Non-descructive shift
             BOR [X+1], EX
 :SHIFT_RIGHT          
         ; set X to pointer to FACEXP or ARGEXP before calling here
         ; set A to the actual exponent therein
 :ROMB999    ADD A, 8
 :ROMB99B    IFB A, 0x80    ; BMI
-                JMP ROMB985 ; make 8 more high bits
+                JMP SHIFT_RIGHT2 ; make 8 more high bits
             IFC A, 0xFF    ; BEQ with low 8 bits
-                JMP ROMB985
+                JMP SHIFT_RIGHT2
 :ROMB99F    SUB A, 8  ; back to normal
             SET Y, A ; pass exponent to Y
 :ROMB9A2    SET A, [FACOV]  ;FAC overflow
             IFC Y, 0x80 ; SBC #8 resulted in carry set
-                JMP ROMB9BA
-            ; rotate first byte of mantissa?
-            ; here we rotate 16 bits instead of 8
-            ; hope that's OK
-:ROMB9A6    SHL [X+1], 1
-:ROMB9AA    BOR [X+1], EX
-            SET C, EX
-            ; ROR [X+1] -> [X+2] -> A
-:ROMB9AC    SHR [X+1], 1
-            BOR [X+1], C
-            SET C, EX  
-:ROMB9AE    SHR [X+1], 1
-            BOR [X+1], C 
+                JMP SHIFT_RIGHT5
+:ROMB9A6    
+:ROMB9AC     
+:ROMB9AE    ASR [X+1], 1
             ; might jump here if X+1 is already shifted
+; ----------------------------------------------------------------------------
+; ENTER HERE FOR SHORT SHIFTS WITH NO SIGN EXTENSION
+; ----------------------------------------------------------------------------
 :SHIFT_RIGHT4
 :ROMB9B0    SET C, EX
             SHR [X+2], 1          
@@ -344,6 +339,7 @@
 :ROMB9B7    ADD Y, 1    ; add one to exponent diff
             IFB Y, 0x00FF  ; low bits not equal 0
                 JMP ROMB9A6  ; do magic bits again
+:SHIFT_RIGHT5
 :ROMB9BA    SET C, 0
             SET EX, 0
             RTS  ; A contains 0x00 through 0xFF00
@@ -909,6 +905,7 @@
             AND A, 0x8000
             SHR [FACHO], 1
             BOR [FACHO], A
+            SET A, 0
             JSR SHIFT_RIGHT4 ; shift rest of FACHO to the right
             SET [BITS], 0
 :ROMBCCB    RTS
