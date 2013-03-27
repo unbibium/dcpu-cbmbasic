@@ -1379,7 +1379,7 @@
             ADD [RAM71], 1
             SET Y, [RAM71]
             JSR ROMAA1D
-            JSR MOVAF
+            JSR COPY_FAC_TO_ARG_ROUNDED
             SET X, A
             IFE A, 0
                 JMP ROMAA07

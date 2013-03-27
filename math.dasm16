@@ -87,8 +87,6 @@
             SET A, [FACEXP]
             JMP FADDT
 
-
-
 :ROMB862    JSR SHIFT_RIGHT
             JMP ROMB8A3
 
@@ -102,17 +100,17 @@
 :FADDT  ; Add FAC and ARG.  (load FACEXP in A first)
 :ROMB86A    ; A = FACEXP
             IFE A, 0       ; 0 + ARG = ARG
-                JMP MOVFA  ; so return ARG.
+                JMP COPY_ARG_TO_FAC  ; so return ARG.
             SET [ARGOV], [FACOV] 
             SET X, ARGEXP ;  pointer
             SET A, [X]    ; A = actual exponent
 :FADD2
-:ROMB877    SET Y, A
-            IFE Y, 0 ; FAC + O = FAC
+:ROMB877    IFE A, 0 ; FAC + O = FAC
                 RTS  ; so return FAC
-:ROMB87B    SUB A, [FACEXP]  ; A = ARGEXP - FACEXP
+            SET Y, A
+            SUB A, [FACEXP]  ; A = ARGEXP - FACEXP
             IFE A, 0         ; equal exponents
-                JMP ROMB8A3
+                JMP FADD3
             IFE EX, -1       ; subtraction underflow
                 JMP ROMB893
 :ROMB881    SET [FACEXP], Y ; Store larger exponent
@@ -128,28 +126,24 @@
 :ROMB897    IFU A, -7  ; Big exponent difference 
                 JMP ROMB862 
                 ;which does this:
-                ;JSR ROMB999 ; 
-                ;JMP ROMB8A3
+                ;JSR SHIFT_RIGHT ; 
+                ;JMP FADD3
             ; I think this is the number of bits
             ; to shift right, in negative 8-bit
             SET Y, A  
             SET A, [FACOV]
-:ROMB89E    
-            SET C, 0
-            SHR [X+1], 1 ; shift mantissa to the right
-            ; X-thing is no longer normalized
+:ROMB89E    SHR [X+1], 1 ; shift mantissa to the right
+            ;rotate 0-bit from the left
             JSR SHIFT_RIGHT4 ; Finish shifting right 
-:FADD3
+:FADD3      ; 84 a000 0000 - 84 bccc cccd
 :ROMB8A3    IFA [SGNCPR], -1 ; result positive
                 JMP FADD4 ; add mantissae and normalize
-  ; make the result negative if a borrow was done
+            ;subtract smaller mantissa and normalize
 :ROMB8A7    ; set Y to the other accumulator
             SET Y, FACEXP
             IFN X, ARGEXP
                 SET Y, ARGEXP
-:ROMB8AF    SET EX, 1
-			XOR A, -1
-			ADX A, [ARGOV]
+:ROMB8AF    SUB A, [ARGOV]
 			SET [FACOV], A
             SET A, [Y+2]
             SBX A, [X+2]
@@ -157,12 +151,13 @@
             SET A, [Y+1]
             SBX A, [X+1]
             SET [FACHO], A
-            ; BCS B8D7, then JSR COMPLEMENT_FAC
+            ; dcpu: 84 e333 3334 - 84 bccc cccd
 ; ----------------------------------------------------------------------------
 ; NORMALIZE VALUE IN FAC
 ; ----------------------------------------------------------------------------
 :NORMALIZE_FAC1
-:ROMB8D2    IFU EX, 0 ; one borrow left to do
+:ROMB8D2    
+			IFU EX, 0 ; one borrow left to do
                 JSR COMPLEMENT_FAC
 :NORMALIZE_FAC2
 :ROMB8D7    SET Y, 0
@@ -243,8 +238,7 @@
                 BOR [FACHO], 0x8000
             RTS
 
-:COMPLEMENT_FAC           
-:NEGFAC ; replace FAC1 with its 2s-complement
+:COMPLEMENT_FAC  ; replace FAC1 with its 2s-complement
 :ROMB947    XOR [FACSGN], -1 
 :COMPLEMENT_FAC_MANTISSA
 :ROMB94D    XOR [FACHO], -1
@@ -295,7 +289,6 @@
 
 ; I think this routine inserts a byte at the beginning
 ; of the mantissa, using BITS as a high overflow byte.
-:MULSHF 
 :SHIFT_RIGHT1
 :ROMB983   SET X, RESHO-1 ; RESHO has no exponent
             ; shift 8 bits from
@@ -321,9 +314,7 @@
 :ROMB9A2    SET A, [FACOV]  ;FAC overflow
             IFC Y, 0x80 ; SBC #8 resulted in carry set
                 JMP SHIFT_RIGHT5
-:ROMB9A6    
-:ROMB9AC     
-:ROMB9AE    ASR [X+1], 1
+:ROMB9A6    ASR [X+1], 1
             ; might jump here if X+1 is already shifted
 ; ----------------------------------------------------------------------------
 ; ENTER HERE FOR SHORT SHIFTS WITH NO SIGN EXTENSION
@@ -454,7 +445,6 @@
 ; Add exponents of ARG and FAC
 ; (called by FMULT and FDIV)
 ; also check for overflow and set result sign
-:MULDIV
 :ADD_EXPONENTS
 :ROMBAB7    SET A, [ARGEXP]
 :ADD_EXPONENTS1
@@ -495,7 +485,7 @@
 ; This quick-multiplies FAC by 10 through bit shifting
 ; and addition.
 :MUL10
-:ROMBAE2    JSR MOVAF ; ARG = FAC
+:ROMBAE2    JSR COPY_FAC_TO_ARG_ROUNDED ; ARG = FAC
 :ROMBAE5    IFE A, 0   ; (A is [FACEXP] now) 
                 RTS ; 0 * 10 = 0
 :ROMBAE9    ADD A, 2  ; ARG *= 4 by increasing exponent
@@ -518,7 +508,7 @@
 ; reciprocal multiplier for 1/10 for parsing float literals
 :DIV10
         SUB [FACEXP], 3 ; FAC <- FAC / 16
-        JSR MOVAF       ; ARG = FAC
+        JSR COPY_FAC_TO_ARG_ROUNDED       ; ARG = FAC
         SET [SGNCPR], 0
 ; reciprocal multiplier for 1/1.25 (5, 10, 20, etc)
 :DIV125
@@ -741,6 +731,7 @@
             
 ; Move from FAC2 to FAC1
 :MOVFA
+:COPY_ARG_TO_FAC
 :ROMBBFC    SET [FACSGN], [ARGSGN]
             SET [FACEXP], [ARGEXP]
 :MOVFAHO
@@ -748,8 +739,8 @@
             SET [FACHO], [ARGHO]
             SET [FACOV], 0
             RTS
-; MOVE rounded FAC into ARG
-:MOVAF 
+
+:COPY_FAC_TO_ARG_ROUNDED
 :ROMBC0C    JSR ROUND
 :MOVEF
 :MAF
@@ -892,7 +883,7 @@
                 JMP ROMBCAF ; skip two lines if positive
             SET [BITS], -1  ; shift 1s from the left instead of 0s
             JSR COMPLEMENT_FAC_MANTISSA
-:ROMBCAF    SET X, FACEXP ; pointer to MULSHF operand
+:ROMBCAF    SET X, FACEXP ; pointer
             IFA A, -8   ; CMP 0xF9
                 JMP QINT2
             JSR SHIFT_RIGHT  ; shift by 8 bits
@@ -1024,7 +1015,7 @@
 :FINLOG
 :ADDACC
 :ROMBD7E    SET PUSH, A
-            JSR MOVAF ; ARG = FAC
+            JSR COPY_FAC_TO_ARG_ROUNDED ; ARG = FAC
             SET A, POP
             JSR FLOAT  ; move A into FAC
             
@@ -1273,14 +1264,14 @@
 ; special case for X^2
 ; ----------------------------------------------------------------------------
 :SQUARE
-		JSR MOVFA  ; FAC <- ARG
+		JSR COPY_ARG_TO_FAC
 		SET [ARISGN], 0
 		JMP FMULTT
 ; ----------------------------------------------------------------------------
 ; SQR(X) = X^0.5
 ; ----------------------------------------------------------------------------
 :SQR
-        JSR MOVAF
+        JSR COPY_FAC_TO_ARG_ROUNDED
         SET A, CON_HALF
         JSR MOVFM
         ; fall through to FPWRT
@@ -1311,7 +1302,7 @@
                 JMP ROMBF9E
             SET A, Y
             SET Y, [RAM07] 
-:ROMBF9E    JSR MOVFA ; TODO: original called ROMBBFE.
+:ROMBF9E    JSR COPY_ARG_TO_FAC ; TODO: original called ROMBBFE.
                     ; was this just for efficiency?
             SET PUSH, Y
             JSR LOG
@@ -1486,11 +1477,11 @@
             JSR FADD
 ; SIN function
 :SIN
-:ROME26B    JSR MOVAF
+:ROME26B    JSR COPY_FAC_TO_ARG_ROUNDED
             SET A, CON_PI_DOUB
             SET X, [ARGSGN]
             JSR DIV
-            JSR MOVAF
+            JSR COPY_FAC_TO_ARG_ROUNDED
             JSR INT   ; really?
             SET [SGNCPR], 0
             JSR FSUBT
