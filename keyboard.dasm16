@@ -90,13 +90,22 @@
 	SUB A, 0x80
 	IFC [KEYSHIFT], 1
 	  IFL A, 0x40
-		XOR A, 0x10 ; change ,-.? to <=>?
+		XOR A, 0x10 ; change ,-./ to <=>?
+	IFC [KEYSHIFT], 1
+		IFE A, 0x5E
+			SET A, 0x27
+	IFB [KEYSHIFT], 1
+		IFE A, 0x5E
+			SET A, 0x22
 	SET C, A
 	RTS
 
 
-:SCANREG
 :SCANSHIFT
+	; allow typing ( in 0x10co.de
+    IFE [KEYASCII], 0x81
+        SET [KEYASCII], 0x28
+:SCANREG
     SET Y, [KEYASCII]
     IFL Y, 0x20
         JMP SCANSPECIAL
