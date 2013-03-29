@@ -265,13 +265,28 @@
                 SET C, 0
             RTS
 
+; create an XOR mask that swaps the background and
+; foreground colors.  The screen editor doesn't need to
+; know about text printed in reverse -- just control
+; characters, which still have the blink bit on.
+:RVS_ON
+			SET A, [COLOR]
+			SET X, A
+			SHR A, 4
+			XOR A, X
+			SHR A, 4
+			XOR A, X
+			SHL A, 4
+			AND A, 0xFF00
+			SET [RVS], A
+			JMP ROME6A8
 
 ; fill screen at current position
 :ROME691    BOR A, 0x40
-:ROME693    
-            SET X, [COLOR]
-            IFE [RVS], 0
+:ROME693    SET X, [COLOR]
+            XOR X, [RVS]    ; visual reverse only
                JMP ROME699
+; fill purposely with a control character
 :ROME697    SET X, [COLOR]
             SHL X, 4
         SET B, EX
@@ -638,7 +653,7 @@
 :ROME785    IFE A, 0x0E  ; lowercase mode
                 JSR TOLOWER
             IFE A, 0x12  ; RVS code
-                SET [RVS], A
+                JMP RVS_ON
             IFE A, CBM_HOME 
                 JSR ROME566
             IFN A, CBM_RIGHT 
