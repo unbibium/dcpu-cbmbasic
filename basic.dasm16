@@ -30,12 +30,12 @@
 :RAM10  ; Flag: Subscript Reference to an Array or User-Defined Function Call
 :SUBFLG DAT 0
 :RAM11  ; Flag: is data input to GET, READ, or INPUT?
-:INPFLG DAT 0
+:INPFLG DAT BLANK
 .DEFINE INF_READ 0x98
 .DEFINE INF_GET 0x40
 .DEFINE INF_INPUT 0x0
 :RAM12
-:TANSGN DAT 0
+:TANSGN DAT BLANK
 :RAM13 ; Current logical file number
 :CHANNL DAT 0
 :RAM14  ; Line Number for LIST/GOTO, memory address for PEEK/POKE/SYS
@@ -1645,7 +1645,7 @@
 :ROMABCE    JSR ERRDIR ; handle illegal use in direct mode
 :ROMABD1    SET A, CBM_COMMA
             SET [RAM01FF], A
-:ROMABD6    JSR ROMABF9 ; get line into input buffer
+:ROMABD6    JSR NXIN ; get line into input buffer
             IFE [CHANNL], 0
                 JMP ROMABEA
 :ROMABDD    JSR ROMFFB7    ; get status
@@ -1663,6 +1663,8 @@
             JMP ROMA8FB ; ... = I, next statement.
 
 ; get line into input buffer
+; X will be set to character before input buffer
+:NXIN
 :ROMABF9    IFN [CHANNL], 0
                 JMP INLIN
             JSR OUTQUES ; print question mark
@@ -1693,7 +1695,7 @@
             IFN [INPFLG], INF_GET ; BVC
                 JMP ROMAC41
             JSR ROME124 ; get one character
-            SET [RAM0200], A
+			SET [RAM0200], A
             SET X, RAM01FF
             JMP ROMAC4D
 :ROMAC41    IFE [INPFLG], INF_READ
@@ -1701,7 +1703,7 @@
             IFN [CHANNL], 0
                 JMP [ROMAC4A]
             JSR OUTQUES ; print question mark
-:ROMAC4A    JSR ROMABF9 ; get line into input buffer
+:ROMAC4A    JSR NXIN ; get line into input buffer
 :ROMAC4D    SET [RAM7A], X
 :INSTART
 :ROMAC51    JSR CHRGET
@@ -1711,18 +1713,19 @@
                 JMP ROMAC65
 :ROMAC5C    ADD X, 1
             SET [RAM7A], X
-            SET [RAM07], A
+            SET A, 0
+            SET [CHARAC], A
             JMP ROMAC71
-:ROMAC65    SET [RAM07], A
+:ROMAC65    SET [CHARAC], A
             SET EX, 1 ; add 1 to address if quote matches
             IFE A, CBM_QUOTE
                 JMP ROMAC72
-            SET [RAM07], CBM_COLON
+            SET [CHARAC], CBM_COLON
             SET A, CBM_COMMA
 :ROMAC71    SET EX, 0
 :ROMAC72    SET [ENDCHR], A
             SET A, [RAM7A]
-            ADD A, EX
+            ADX A, 0
             JSR STRLT2  ; STRLIT for unquoted string
             SET [RAM7A], [RAM71] ; move cursor to after string
             JSR ROMA9DA ; assign to a string variable
@@ -2234,12 +2237,12 @@
             JSR AYINT    ; float to integer
             SET A, [RAM64]
             XOR A, [RAM0B]
-            SET [RAM07], A
+            SET [CHARAC], A
             JSR MOVFA
             JSR AYINT
             SET A, [RAM64]
             XOR A, [RAM0B]
-            AND A, [RAM07]
+            AND A, [CHARAC]
             XOR A, [RAM0B]
             JMP GIVAYF
                 
