@@ -53,8 +53,8 @@
     SET A, 2 ; check key
     SET B, DCPU_CTRL
     HWI [KEYBOARD]
-	SHL C, 2  
-	SET [KEYSHIFT], C
+    SHL C, 2  
+    SET [KEYSHIFT], C
     SET A, 2 ; check key
     SET B, DCPU_SHIFT
     HWI [KEYBOARD]
@@ -67,7 +67,7 @@
         SET [KEYASCII], C ; for scanning during clock interrupt
     SET B, -1
     IFE C, DCPU_STOP
-    	SET B, 0x7F
+        SET B, 0x7F
     SET [RAM91], B
     ;SET A, 2 ; check key
     ;SET B, [KEYASCII] ; original key
@@ -84,23 +84,23 @@
 ; I hesitate to do anything else due to the probability
 ; that it won't work on non-US keyboards.
 :HIGHASCII
-	SET A, C
-	SUB A, 0x80
-	IFC [KEYSHIFT], 1
-	  IFL A, 0x40
-		XOR A, 0x10 ; change ,-./ to <=>?
-	IFC [KEYSHIFT], 1
-		IFE A, 0x5E
-			SET A, 0x27
-	IFB [KEYSHIFT], 1
-		IFE A, 0x5E
-			SET A, 0x22
-	SET C, A
-	RTS
+    SET A, C
+    SUB A, 0x80
+    IFC [KEYSHIFT], 1
+      IFL A, 0x40
+        XOR A, 0x10 ; change ,-./ to <=>?
+    IFC [KEYSHIFT], 1
+        IFE A, 0x5E
+            SET A, 0x27
+    IFB [KEYSHIFT], 1
+        IFE A, 0x5E
+            SET A, 0x22
+    SET C, A
+    RTS
 
 
 :SCANSHIFT
-	; allow typing ( in 0x10co.de
+    ; allow typing ( in 0x10co.de
     IFE [KEYASCII], 0x81
         SET [KEYASCII], 0x28
 :SCANREG
@@ -121,21 +121,21 @@
     RTS
 
 :SCAN_PI
-	SET [SFDX], 0xFF
-	RTS
+    SET [SFDX], 0xFF
+    RTS
 
 :SCANSPECIAL
     SET [SFDX], CBM_RETURN
     IFE Y, DCPU_INSERT
         SET [SFDX], CBM_INSERT
     IFE Y, DCPU_BACKSPACE
-		JMP SCAN_DELETE
+        JMP SCAN_DELETE
     IFN Y, DCPU_DELETE
-    	JMP SCAN_NOT_DELETE
+        JMP SCAN_NOT_DELETE
 :SCAN_DELETE
-	IFC [SHFLAG], 1  ; unshifted
+    IFC [SHFLAG], 1  ; unshifted
         SET [SFDX], CBM_DELETE
-	IFB [SHFLAG], 1  ; shifted
+    IFB [SHFLAG], 1  ; shifted
         SET [SFDX], CBM_INSERT
 :SCAN_NOT_DELETE
     RTS
@@ -152,17 +152,21 @@
     ADD A, Y
     IFG Y, 0x2F
         IFL Y, 0x3A
-			SET [SFDX], [A]
-	; ctrl-letter
-	SET A, Y
-	AND A, 63
-	IFG A, 0
-	    IFL A, 30
-	        SET [SFDX], A
+            SET [SFDX], [A]
+    ; ctrl-letter
+    SET A, Y
+    AND A, 63
+    IFG A, 0
+        IFL A, 30
+            SET [SFDX], A
     ; lowercase mode with ctrl-n
     ; uppercase mode with ctrl-,
-	IFE A, CBM_COMMA
-		SET [SFDX], 142 
+    IFE A, CBM_COMMA
+        SET [SFDX], 142 
+    IFE A, 0x3D  ; =
+        SET [SFDX], 0x13  ; HOME
+    IFE A, 0x2D ; + 
+        SET [SFDX], 0x93  ; CLR
     RTS
 
 ; TODO: CBM-graphics characters
@@ -173,7 +177,12 @@
     ADD A, Y
     IFG Y, 0x2F
         IFL Y, 0x39
-			SET [SFDX], [A]
+            SET [SFDX], [A]
+    SET A, Y
+    IFE A, 0x3D  ; =
+        SET [SFDX], 0x93  ; CLR
+    IFE A, 0x2D ; + 
+        SET [SFDX], 0x93  ; CLR
     RTS
 
 :SCANARROWS
