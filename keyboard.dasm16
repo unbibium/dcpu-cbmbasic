@@ -171,10 +171,12 @@
     IFG A, 0
         IFL A, 30
             SET [SFDX], A
-    ; lowercase mode with ctrl-n
+    ; lowercase mode with ctrl-n or ctrl-.
     ; uppercase mode with ctrl-,
     IFE A, CBM_COMMA
         SET [SFDX], 142 
+    IFE A, 0x2E ; .
+        SET [SFDX], 14 
     IFE A, 0x3D  ; =
         SET [SFDX], 0x13  ; HOME
     IFE A, 0x2D ; + 
