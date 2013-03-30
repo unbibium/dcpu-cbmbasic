@@ -154,18 +154,7 @@
 :ROME591    IFN X, [LXSP]
                 RTS
             JMP ROME6ED ; find beginning of logical line
-:LP2       ; get a character from the keyboard buffer
-:ROME5B4    SET Y, [KEYD] 
-            SET X, 0
-:ROME5B9    SET [KEYD+X], [KEYD+1+X]
-            ADD X, 1
-            IFN X, [NDX]
-               JMP ROME5B9
-            SUB [NDX], 1
-            SET A, Y
-            IAQ 0
-            SET EX, 0
-            RTS
+
 ; WAIT FOR RETURN FOR KEYBOARD
 :ROME5CA    JSR ROME716 ; output to the screen
 :ROME5CD    SET A, [NDX]
@@ -957,7 +946,7 @@
     .FILL 52 BLANK
 ; XOR masks to toggle graphics-uppercase 
 :FONTXOR2
-    .FILL 54 BLANK
+    .FILL 52 BLANK
 
 :CBM_PALETTE
     DAT 0x000, 0xfff, 0xf00, 0x0ff

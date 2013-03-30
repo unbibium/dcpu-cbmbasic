@@ -41,6 +41,19 @@
 :RAM028F
 :KEYLOG     DAT 0 ; ROM?
 
+;------------------------------------------------------
+:LP2       ; get a character from the keyboard buffer
+:ROME5B4    SET Y, [KEYD] 
+            SET X, 0
+:ROME5B9    SET [KEYD+X], [KEYD+1+X]
+            ADD X, 1
+            IFN X, [NDX]
+               JMP ROME5B9
+            SUB [NDX], 1
+            SET A, Y
+            IAQ 0
+            SET C, 0
+            RTS
 
 ;-----------------------------------------------------------
 ; KEYBOARD INTERRUPT ROUTINE - triggered by keyboard events
