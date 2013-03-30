@@ -38,15 +38,19 @@ mostly like they do on the C64:
 
 * Screen editing
 * Program entry
+* PETSCII control codes, and ways to type them: 
+   * Ctrl-1 through 8 and Ctrl-Shift-1 through 8 for colors
+   * Ctrl-9 and Ctrl-0 for reverse on/off
+   * Ctrl-= for HOME
+   * Ctrl-+ for CLR
+   * Ctrl-, for uppercase, Ctrl-. for lowercase.
+   * Arrow keys
+   * Ctrl-Letter works on 0x10co.de
 * Immediate mode
-* BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, ON,
-                  NEW, STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT
+* BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, ON, NEW,
+                  STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT, GET
 * BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$, ASC, EXP,
                    SIN, COS, LOG, SPC, MID$, STR$
-* PETSCII control codes for color change, reverse text, cursor
-  movement, and switching between graphics and lowercase character
-  sets.  Quote mode allows control characters to be typed into
-  programs.
 * BASIC keyword abbreviations with shifted second letters
 * The ? abbreviation for PRINT
 * Expressions involving floating-point addition, subtraction,
@@ -64,25 +68,25 @@ mostly like they do on the C64:
 * Functions (DEF FN)
 
 I've put some stub routines in unused commands for testing purposes:
-* LOAD will load an old chatbot program called ELIZA into memory.
+* LOAD can be used to load a few small demo programs.  Use LOAD
+  by itself to cycle through, or LOAD"$" for a directory.
   You can then use RUN to execute it, or LIST to see the source code.
 * VERIFY will display a table that describes how program memory
   is currently being used.
 
 Just about anything else won't work, and may even crash the machine.
 Here's what's missing, in the rough order of when I'm going to add it:
-* other functions (VAL, PEEK, POS, TAB)
+* other functions (VAL, POS, TAB)
 * Program storage (LOAD, SAVE, VERIFY)
 * File access (OPEN, CLOSE, GET, GET#, INPUT#, PRINT#, CMD)
 * 32-bit division (currently the power operator
     * LOG, power, and TAN depend on this.
-* POKE, WAIT, and PEEK (I'll need to stabilize the memory map first)
+* A stable memory map for POKE, WAIT and PEEK 
 * More trigonometry (TAN, ATN)
 * Special variables ST, TI, TI$
 * a few DCPU-specific uses, like using DIM to allocate memory
   for the SPED-3.
 * direct DCPU access with SYS, USR()
-* Non-blinking reverse text.
 
 Additionally, the code needs to be optimized and cleaned up.
 Many speed gains are possible, though it may never be as fast
