@@ -48,8 +48,12 @@
 ;
 :RAM0286
 :COLOR  DAT 0xE600
+;
+; AUTODN controls a subtle change in behavior between
+; printing and typing.
 :RAM0292
 :AUTODN     DAT 0
+;
 ; Temporary index to the next line for screen scrolling
 :RAM02A5    DAT 0
 
@@ -120,7 +124,7 @@
             SUB X, 1
             IFA X, -1 ; BPL
                 JMP ROME560
-:ROME566
+:ROME566 ; HOME cursor
             SET [PNTR], 0 ; column 0
             SET [TBLX], 0 ; row 0
 ; set address of current screen line
@@ -655,7 +659,7 @@
             IFE A, 0x12  ; RVS code
                 JMP RVS_ON
             IFE A, CBM_HOME 
-                JSR ROME566
+                JMP DOHOMEKEY
             IFN A, CBM_RIGHT 
                 JMP ROME7AD
 :ROME796        ; do crsr-right
@@ -691,6 +695,8 @@
             JMP ROME6A8 ; return from print
 :ROME7CE    JSR ROME8CB
             JMP ROMEC44
+:DOHOMEKEY  JSR ROME566
+			JMP ROME6A8
             
 ; Put shifted chars to screen
 
@@ -790,9 +796,6 @@
     SET A, 2 ; MAKE VISIBLE CUSTOM PALETTE
     SET B, CBM_PALETTE
     HWI [MONITOR]
-    SET A, 1 ; MAKE VISIBLE CUSTOM FONT
-    SET B, VISFONT  ; visible font area
-    HWI [MONITOR]
 ; Copy XOR map that changes uppercase to lowercase
     SET I, VISFONT+130 ; Location of letter A
     SET J, FONTXOR1
@@ -821,11 +824,27 @@
     STI [J], A
     IFL J, FONTXOR2+52
        SET PC, FONTLOOP2
+    ; make checkmark xor
+    XOR [CHECKMARK_XOR], [CHECKMARK_GFX]
+    XOR [CHECKMARK_XOR+1], [CHECKMARK_GFX+1]
+    ; start in lowercase?
     IFE STARTLOWER, 1
         JSR TOGGLEFONT
     ; i hate the crossbar zero in a 4x8 font
     ; this looks much better
     SET [VISFONT+96], 0x3E63
+    ; c64-like uparrow and leftarrow
+:FONTARROWLOOP
+	SET J, UPLEFT
+	SET I, VISFONT+60
+	STI [I], [J]
+	STI [I], [J]
+	STI [I], [J]
+	STI [I], [J]
+	; make font visible
+    SET A, 1 ; MAKE VISIBLE CUSTOM FONT
+    SET B, VISFONT  ; visible font area
+    HWI [MONITOR]
     RTS
 
 :TOGGLEFONT
@@ -839,6 +858,9 @@
     ADD I, 1
     IFL I, 52
         JMP TOGGLELOOP
+    ; toggle box-drawing and checkmark in CBM area
+    XOR [VISFONT+244], [CHECKMARK_XOR]
+    XOR [VISFONT+245], [CHECKMARK_XOR+1]
     RTS
 
 :TOUPPER
@@ -880,9 +902,10 @@
     DAT 0xFF00, 0x00 ; left 25%
     DAT 0x0000, 0x00FF ; right 25%
     DAT 0x0303, 0x0303 ; top 25%
-    DAT 0x0707, 0x0707
-    DAT 0xE0E0, 0xE0E0
-    DAT 0xC0C0, 0xC0FF
+    DAT 0x0707, 0x0707 ; top 3/8
+    DAT 0xE0E0, 0xE0E0 ; bottom 3/8
+:CHECKMARK_GFX
+    DAT 0xC0C0, 0xC0FF ; box drawing/checkmark
     DAT 0xF0F0, 0x0000
     DAT 0x0000, 0x0F0F
     DAT 0x181F, 0x0000
@@ -913,25 +936,28 @@
     DAT 0xFF00, 0 ;T
     DAT 0x00F0, 0x1818 ;U
     DAT 0xC33C, 0x3CC3 ;V
-    DAT 0x3C66, 0x3C00 ;W
-    DAT 0x4C73, 0x4C00 ;X
-    DAT 0, 0xFF00 ;Y
-    DAT 0x1C7F, 0x1C00 ;Z
+    DAT 0x3C66, 0x3C00 ;Empty circle
+    DAT 0x4C73, 0x4C00 ;Clubs
+    DAT 0, 0xFF00      ;Verticle bar at 5/8
+    DAT 0x1C7F, 0x1C00 ;Diamond
     DAT 0x18FF, 0x1818; cross
-    DAT 0x33CC, 0 ; \
+    DAT 0x33CC, 0 ; Left 50%
     DAT 0x00FF, 0 ; Petscii vertical bar
-    DAT 0x7C04, 0x7C00 ; ^
-    DAT 0x0003, 0x0F3F ; _
-:ARROWGFX
-    DAT 0x0C7F, 0x0C00 ; up arrow
-    DAT 0x183C, 0x1818 ; left arrow
-    
+    DAT 0x7C04, 0x7C00 ; pi
+    DAT 0x0003, 0x0F3F ; Upper right triangle
+:UPLEFT  ; arrow graphics
+    DAT 0x0CFE, 0x0C00
+    DAT 0x187E, 0x1818
+
+; this will be converted to an XOR mask at runtime.
+:CHECKMARK_XOR
+    DAT 0x7030, 0x0C03  
 ; XOR masks to toggle uppercase-lowercase
 :FONTXOR1
     .FILL 52 BLANK
 ; XOR masks to toggle graphics-uppercase 
 :FONTXOR2
-    .FILL 52 BLANK
+    .FILL 54 BLANK
 
 :CBM_PALETTE
     DAT 0x000, 0xfff, 0xf00, 0x0ff
