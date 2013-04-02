@@ -722,7 +722,6 @@
 :ROMA55D    JMP ROMA53C 
 
 ; Get a line from the console.
-; X will be set to the length of the string (1 when blank)
 ; input stored in RAM0200, zero-terminated
 :INLIN
 :ROMA560    SET X, 0
@@ -731,7 +730,7 @@
                 JMP ROMAACA ; mark end and return
             SET [RAM0200+X], A
             ADD X, 1
-            IFL X, HW_COLS*ROWS_IN_LINE
+            IFU X, HW_COLS*ROWS_IN_LINE
                 JMP ROMA562
             IFE DEBUG_SNERR, 0
                 JMP LTLERR
@@ -739,10 +738,15 @@
             ; how long did it think the line was?
             SET A, X
             JSR LINPRT
-            SET A, 0x62
+            ;SET A, 62
+            ;JSR CHROUT
+            ;SET A, HW_COLS*ROWS_IN_LINE
+            ;JSR LINPRT
+            SET A, CBM_RETURN
             JSR CHROUT
-            SET A, HW_COLS*ROWS_IN_LINE
-            JSR LINPRT
+            SET A, CBM_RETURN
+            JSR CHROUT
+
 :LTLERR
             SET X, 0x17 ; ?LINE TOO LONG
             JMP ERROR
@@ -787,9 +791,8 @@
 :ROMA5A8    IFL A, 0x3C ; Digit
                 JMP ROMA5C9
 :ROMA5AC    SET [RAM71], Y  ; cache position in thing
-            SET Y, 0
-            SET [COUNT], 0
-            SUB Y, 1
+            SET [COUNT], 0  ; start at first token
+            SET Y, -1       ; start at first byte of token table
             SET [RAM7A], X
             SUB X, 1
 ; Loop through input buffer and token, see if they match.
@@ -797,8 +800,7 @@
             ADD X, 1 ; match the next byte of the input?
 ; loop section 1
 :ROMA5B8    SET A, [X]
-:ROMA5BC    SUB A, [TOKEN_NAMES+Y]
-            AND A, 0xFF
+:ROMA5BC    XOR A, [TOKEN_NAMES+Y]
             IFE A, 0
                 JMP ROMA5B6
 :ROMA5C1    ; 0x80 matches both the final character of
@@ -806,12 +808,12 @@
             ; of an abbreviated command.
             IFN A, 0x80
                 JMP ROMA5F5            
-            BOR A, [COUNT]  ;untested
+            BOR A, [COUNT]  ;A = Token = 0x80 + token's position in list
 :ROMA5C7    SET Y, [RAM71]
 :ROMA5C9    ADD X, 1 ; Move to next character in buffer
             ADD Y, 1 ; Move to...?
             SET [RAM01FD+Y], A
-            IFE A, 0
+            IFE A, 0  ; end of line
                 JMP ROMA609
 :ROMA5D4    SUB A, CBM_COLON
             IFE A, 0
@@ -819,22 +821,18 @@
             IFN A, (BASIC_DATA_TOKEN-CBM_COLON) ; DATA token
                 JMP ROMA5DE
 :ROMA5DC    SET [RAM0F], A ; Set quote mode ON for DATA
-:ROMA5DE    SUB A, (BASIC_REM_TOKEN-CBM_COLON) 
-            AND A, 0xFF
-            IFN A, 0
+:ROMA5DE    IFN A, (BASIC_REM_TOKEN-CBM_COLON) 
                 JMP ROMA582 ; just move to next character
             SET [ENDCHR], 0 
             ; Copy characters literally until either
             ; end of line, or whatever's in [ENDCHR].
 :ROMA5E5    SET A, [X]
-            AND A, 0xFF
-            IFE A, 0
+            IFC A, 0xFF
                 JMP ROMA5C9
 :ROMA5EA    IFE A, [ENDCHR]
                 JMP ROMA5C9
 :ROMA5EE    ADD Y, 1
             SET [RAM01FD+Y], A
-            ;SET [RAM0200-3+Y], A
             ADD X, 1
             IFB X, 0xFF ; BNE in 8-bit
                 JMP ROMA5E5
@@ -845,7 +843,7 @@
             ADD [COUNT], 1
             ; Skip past end of this token
 :ROMA5F9    ADD Y, 1
-:ROMA5FA    IFC [TOKEN_NAMES-1+Y], 0x80
+            IFC [TOKEN_NAMES-1+Y], 0x80
                 JMP ROMA5F9
             IFN [TOKEN_NAMES+Y], 0
                 JMP ROMA5B8 ; Try next token
@@ -854,8 +852,7 @@
                 JMP ROMA5C7
             ; branches here if null character found
 :ROMA609    SET [RAM01FE+Y], A  ; ends with two NULLs in a row
-            ;SET [RAM0200-3+Y], 0
-:ROMA60C    SET [RAM7A], RAM0200-1
+            SET [RAM7A], RAM0200-1
             RTS
 
 ; SEARCH for a line in a program
