@@ -864,10 +864,9 @@
 :ROMA613    SET A, [TXTTAB]     ; $2B
 :FINDLNA
 :ROMA617    SET I, 1
-:ROMA619    SET [LOWTR], A
+            SET [LOWTR], A
             ADD I, [LOWTR]  ; I = NEXT line in linked list
-:ROMA61D    SET A, [I] ; get address of that line
-            IFE A, 0
+            IFE [I], 0 ; if address of that line is 0
                 JMP ROMA640
             SET A, [LINNUM]
             IFL A, [I]

@@ -34,34 +34,10 @@
 .INCLUDE "keyboard.dasm16"
 .INCLUDE "screen.dasm16"
 
-:RAM90
-:STATUS DAT 0
-:RAM9D
-:MSGFLG DAT 0           
-
-
-:RAM93  
-:VERCK  DAT 0
-:RAM97
-:XSAV   DAT 0
-:RAM99  
-:DFLTN  DAT 0
-:RAM9A  
-:DFLTO  DAT 3
-
-:RAMAC  
-:SAL    DAT 0
-:RAMAE  
-:EAL    DAT 0
 ; scroll pointer
 :SCPNT  DAT 0
 :RAMB2  DAT 0
 :RAMC1  DAT 0
-; Filename and length
-:RAMB7
-:FNLEN  DAT 0
-:RAMBB
-:FNADR  DAT 0
 
 ; keyboard memory
 ;
@@ -164,13 +140,13 @@
                 SET X, 0x1E   ; BREAK
             JMP ERROR
 
-; CHROUT plus error checking for BASIC
+; CHROUT/CHRIN plus error checking for BASIC
 ; (treats EX as error flag, X as error number)
-:ROME10C    JSR CHROUT
+:ROME10C    JSR [ICHROUT]
             IFN EX, 0 ; carry bit set
                 JMP ROME0F9
             RTS
-:ROME112    JSR CHRIN
+:ROME112    JSR [ICHRIN]
             IFG EX, 0
                 JMP ROME0F9
             RTS
@@ -197,6 +173,8 @@
             SET A, X
             RTS
 
+; special debugging code that shows
+; where all the line links are
 :LINELINKS
 		SET PUSH, A
 		SET PUSH, B
@@ -217,8 +195,17 @@
     	SET B, POP
     	SET A, POP
     	RTS
-    	
-; normal IRQ interrupt
+
+; *****************************************************
+;    Normal IRQ Interrupt 
+;
+; This runs 60 times per second, and has the following
+; duties:
+;   * Update system clock
+;   * Blink the cursor if it is visible
+;   * Scan the keyboard, add new characters to the
+;     keyboard buffer.
+; *****************************************************
 :IRQ_HANDLER
 :ROMEA31    
             ; some debugging for last line link bugs
@@ -348,53 +335,6 @@
 :ROME3A2    dat 0x9000
 
 
-; DCPU hardware
-
-:KEYBOARD dat 0
-:MONITOR dat 0
-:CLOCK DAT 0
-
-:IOINIT
-    hwn i
-:map_hardware
-    sub I, 1
-    hwq I
-    ife B, 0x7349
-        ife A, 0xF615
-            set [MONITOR], I
-    ife B, 0x30CF
-        ife A, 0x7406
-            set [KEYBOARD], I
-    ife B, 0x12d0
-        Ife A, 0xb402
-            set [CLOCK], I
-    ife A, 0x12d0
-        Ife B, 0xb402
-            set [CLOCK], I
-    ifn I, 0
-        set pc, map_hardware
-        
-; Next, we set the monitor's screen to  ;
-; start at the memory location 
-:initialize_monitor
-    set A, 0  ; set screen memory
-    set B, SCREENMEM
-    hwi [MONITOR]
-
-    JSR MAKE_CBM_FONT
-    set A, 3  ; set border
-    set B, 0xE  ; light blue
-    hwi [MONITOR]
-
-:initialize_keyboard
-    SET A, 3
-    SET B, KEYINT
-    HWI [KEYBOARD]
-
-    RTS
-
-    
-
 :ROMF017    ; RS232-related
             RTS
 :ROMF12B    ; print kernal message indexed by Y
@@ -411,11 +351,6 @@
 :ROMF13C    SET C, 0 ; no error
             RTS
 :ROMF1FC    RTS
-:DEF_LOAD
-:ROMF49E    RTS
-:DEF_SAVE
-; i forgot the address
-        RTS
 :DEF_UDTIM
 :ROMF69B    RTS
 :DEF_RDTIM
@@ -424,138 +359,8 @@
 :ROMF6E4    RTS
 :CINT
 :ROMFF5B    RTS
-:DEF_GETIN
-:ROMF13E    IFN [DFLTN], 0
-               JMP ROMF14A
-            IFE [NDX], 0    ; if keyboard buffer is blank
-               JMP ROMF155 ; return 0
-            ; SEI
-            JMP ROME5B4
 
-:ROMF14A     IFN [DFLTN], 2 
-               JMP ROMF166
-             ; insert serial handler here?
-             RTS
-:ROMF155    ; return blank result for getin
-            SET C, 0
-            SET A, 0
-            SET Z, 1
-            RTS
-
-; input a character
-; if keyboard: get line, and then return
-; characters one at a time
-
-:DEF_CHRIN
-:ROMF157   IFN [DFLTN], 0
-             JMP ROMF166
-           ; record current position of cursor as
-           ; start of input on the screen.
-           SET [LXSP+1], [PNTR] ; column 
-           SET [LXSP], [TBLX]   ; row  
-           JMP ROME632
-
-:ROMF166   IFN [DFLTN], 3
-               JMP ROMF173
-           SET [CRSW], 3
-           SET [INDX], [LNMX]
-           JMP ROME632 ; input a character from screen
-
-:ROMF173   IFG [DFLTN], 3 ; C64 serial bus device
-               JMP ROMF1AD 
-           ; ... omitted cassette and RS232 code
-           RTS
-
-:ROMF1AD   ;IFE [RAM90], 0
-           ;    JMP ROMEE13 ; Read byte from serial bus
-           SET A, CBM_RETURN ; CR?
-       SET EX, 0
-       RTS
-
-
-; output a character
-; stub: always output to screen
-:DEF_CHROUT
-:ROMF1CA   IFE [DFLTO], 3
-             JMP ROME716
-       ;IFL [DFLTO], 3
-       ;  JMP ROMEDDD  ; Write byte to serial bus
-       ; ...
-           RTS
-
-:ROMF208   JSR ROMF017 ; rs232-related
-:ROMF20B   JMP ROMF1FC ; also stubbed for now
-
-; set input device
-:DEF_CHKIN
-:ROMF20E    RTS
-
-; set output device
-:DEF_CHKOUT
-:ROMF250    RTS
-
-; close a file
-:DEF_CLOSE
-:ROMF291    RTS
-
-; close all files
-:DEF_CLALL
-:ROMF32F    RTS
-
-; restore I/O to default devices
-:ROMF333    RTS
-
-; open a file
-:DEF_OPEN
-:ROMF34A    RTS
-:ROMF5D2    SET Y, MSG_LOADING
-            IFN [RAM93], 0
-               SET Y, MSG_VERIFYING
-            JMP ROMF12B 
-
-; save ram to a device
-; X is an address, A is a pointer.
-
-:ROMF5DD   SET [EAL], X
-           SET [RAMC1], [A]
-           ;JMP [RAM0332] ;normally F5ED
-
-; standard save ram entry
-:ROMF5ED  RTS
-
-; handle messages for loading
-:ROMF5AF    IFC [MSGFLG], 0x80
-                RTS
-            SET Y, MSG_SEARCHING
-                JSR ROMF12F
-            SET A, [FNLEN]
-            IFE A, 0 
-                RTS
-            SET Y, 17
-            JSR ROMF12F
-            SET Y, [FNLEN]
-            IFE Y, 0
-                RTS
-:ROMF5C7    SET A, [FNADR+Y]
-            JSR CHROUT
-            ADD Y, 1
-            IFN Y, [FNLEN]
-                JMP ROMF5C7
-            RTS
-
-; do load/verify message
-
-:MSG_SEARCHING
-            .DAT 13, "SEARCHIN", 0xC7
-:MSG_LOADING
-:ROMF106    .DAT 13, "LOADIN", 0xC7
-:MSG_SAVING
-:ROMF10E    .DAT 13, "SAVIN", 0xC7
-:MSG_VERIFYING
-:ROMF116    .DAT 13, "VERIFYIN", 0xC7
-
-; close serial bus device
-;:ROMF642  RTS
+.include "io.dasm16"
 
 ; check for STOP key (probably ESC)
 ; return C=1 if STOP key pressed.
@@ -572,28 +377,6 @@
 
 ; increment real time clock
 ;:ROMF89B  RTS
-
-; Here are some subroutines that can probably be
-; replaced with a single DCPU-16 instruction
-; where appropriate.
-
-; move save/load address into $AC/$AD
-
-;:ROMFB8E    SET [SAL], [RAMC1]
-;            RTS
-
-; compare $AC/$AD with $AE/$AF
-
-;:ROMFCD1    SET C, 0
-;            IFG [SAL], [EAL]
-;               SET C, 1
-;            RTS
-            
-
-; increment $AC/$AD
-
-;:ROMFCDB    ADD [SAL], 1
-;            RTS
 
 ; RESET routine  (SYS 64738)
 
@@ -673,25 +456,6 @@
             SET [HIBASE], SCREENMEM
 :ROMFD9A    RTS
 
-:SETNAM
-:ROMFFBD
-:ROMFDF9    SET [FNLEN], A
-            SET [FNADR], X
-            RTS
-; get IO status?
-:ROMFE07
-        SET A, 0
-        RTS
-
-; control kernal messages
-:SETMSG
-:ROMFF90
-:ROMFE18    SET [MSGFLG], A
-            SET A, [STATUS]
-; add A bits to ST
-            BOR [STATUS], A
-            RTS
-
 ; read/set top of memory
 :MEMTOP
 :ROMFF99
@@ -766,19 +530,6 @@
 :ROMFFFA    DAT ROMFE43   ; NMI vector
 :ROMFFFC  DAT ROMFCE2    ; RESET vector
 :ROMFFFE  DAT ROMFF48     ; BRK vector
-
-; jump points for if assertion fails
-:BASCRASH
-    SET A, [TXTTAB+1]
-    SET B, [TXTTAB+2]
-    SET C, [TXTTAB+3]
-    SET X, [TXTTAB+4]
-    SET Y, [TXTTAB+5]
-    SET Z, [TXTTAB+6]
-    SET I, [TXTTAB+7]
-    SET J, [TXTTAB+8]
-	SET EX, [TXTTAB+9]
-	DAT 0x2400
 	    
 :VARTABCRASH
     SET A, [VARTAB]
