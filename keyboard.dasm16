@@ -96,17 +96,25 @@
 ; I hesitate to do anything else due to the probability
 ; that it won't work on non-US keyboards.
 :HIGHASCII
+    IFE C, 0xC0
+        IFB [KEYSHIFT], 1
+            SET C, 0xFE   ; tilde (pi)
+    IFE C, 0xC0
+        SET C, 0xDF ; underscore (leftarrow)
     SET A, C
     SUB A, 0x80
+    IFC [KEYSHIFT], 1
+      IFE A, 0x3A ; semicolon
+        SET A, 0x2B ; semicolon xor 0x10
     IFC [KEYSHIFT], 1
       IFL A, 0x40
         XOR A, 0x10 ; change ,-./ to <=>?
     IFC [KEYSHIFT], 1
         IFE A, 0x5E
-            SET A, 0x27
+            SET A, 0x27 ; apostrophe
     IFB [KEYSHIFT], 1
         IFE A, 0x5E
-            SET A, 0x22
+            SET A, 0x22 ; double quote
     SET C, A
     RTS
 
@@ -115,6 +123,9 @@
     ; allow typing ( in 0x10co.de
     IFE [KEYASCII], 0x81
         SET [KEYASCII], 0x28
+    ; allow typing & in 0x10co.de
+    IFE [KEYASCII], 0x80
+        SET [KEYASCII], 0x26
 :SCANREG
     SET Y, [KEYASCII]
     IFL Y, 0x20

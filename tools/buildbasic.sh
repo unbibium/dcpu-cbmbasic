@@ -1,7 +1,14 @@
 #!/bin/bash
-../qplop.py startrek.lst startrek.dprg
-../qplop.py eliza.lst eliza.dprg
-../qplop.py tenprint.lst tenprint.dprg
-../qplop.py dirlist.lst dirlist.dprg
+#
+# run from current directory
+#
+# todo: make file list dynamic
 
-echo '; DEMO PROGRAMS' | cat - directory.dasm16 *.dprg >|demo.dasm16
+./tokenize.py ../demos/startrek.lst startrek.dprg
+./tokenize.py ../demos/eliza.lst eliza.dprg
+./tokenize.py ../demos/tenprint.lst tenprint.dprg
+./tokenize.py ../demos/dirlist.lst dirlist.dprg
+
+echo '; DEMO PROGRAMS' | cat - directory.dasm16 *.dprg >|../demo.dasm16
+
+rm *.dprg
