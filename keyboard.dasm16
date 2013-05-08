@@ -96,27 +96,36 @@
 ; I hesitate to do anything else due to the probability
 ; that it won't work on non-US keyboards.
 :HIGHASCII
-    IFE C, 0xC0
-        IFB [KEYSHIFT], 1
-            SET C, 0xFE   ; tilde (pi)
-    IFE C, 0xC0
-        SET C, 0xDF ; underscore (leftarrow)
     SET A, C
     SUB A, 0x80
-    IFC [KEYSHIFT], 1
-      IFE A, 0x3A ; semicolon
-        SET A, 0x2B ; semicolon xor 0x10
-    IFC [KEYSHIFT], 1
-      IFL A, 0x40
-        XOR A, 0x10 ; change ,-./ to <=>?
-    IFC [KEYSHIFT], 1
-        IFE A, 0x5E
-            SET A, 0x27 ; apostrophe
     IFB [KEYSHIFT], 1
-        IFE A, 0x5E
-            SET A, 0x22 ; double quote
+        JMP HIGHASCII_SHIFT
+    ; translations without SHIFT
+    IFE A, 0x40
+        SET A, 0x5F ; underscore (leftarrow)
+    IFL A, 0x40
+        XOR A, 0x10 ; change ,-./ to <=>?
+    IFE A, 0x2B ; was a plus w/o shift key
+        ADD A, 18 ; equals sign
+    IFE A, 0x2A ; was a colon w/o shift key
+        ADD A, 17 ; semicolon
+    IFE A, 0x5E
+        SET A, 0x27 ; apostrophe
     SET C, A
     RTS
+:HIGHASCII_SEMICOLON
+    ADD A, 1
+:HIGHASCII_SHIFT
+    IFE A, 0x3B ; semicolon with shift key
+        SUB A, 0x10 ; is really a plus sign
+    IFE A, 0x5E
+        SET A, 0x22 ; double quote
+    IFE A, 0x40
+        SET A, 0x7E   ; tilde (pi)
+:HIGHASCII_END
+    SET C, A
+    RTS
+
 
 
 :SCANSHIFT
