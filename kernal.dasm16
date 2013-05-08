@@ -366,11 +366,14 @@
 ; return C=1 if STOP key pressed.
 :DEF_STOP
 :ROMF6ED    SET Z, 0
-			SET C, 0
+                SET C, 0
             IFN [RAM91], 0x7F
                 RTS
             JSR ROMFFCC
-            SET [RAMC6], A
+          ; clear keyboard buffer
+            SET [RAMC6], 0
+           ; clear stop flag?
+            SET [RAM91], 0
             SET C, 1
             SET Z, 1
             RTS
