@@ -1,7 +1,9 @@
 dcpu-cbmbasic
 =============
 
-Port of Commodore 64 BASIC and KERNAL to the DCPU-16
+Port of Commodore 64 BASIC and KERNAL to the DCPU-16.
+
+To see it in action, watch this: https://www.youtube.com/watch?v=om-JTv51JqI
 
 When I started looking into 0x10c and DCPU-16 programming, I noticed
 there were a few KERNALs but no BASIC interpreter.  I considered
@@ -32,13 +34,12 @@ visible on the screen.  I've made this work with a custom font,
 but it means that this won't work with any text-mode emulators,
 if they exist.  
 
-A substantial fraction of the features work, but it's not complete
-yet.  Here's a mostly-complete list of things that will work
-mostly like they do on the C64:
+Working features
+----------------
 
 * Screen editing
-* Program entry
-* PETSCII control codes, and ways to type them: 
+* PETSCII uppercase and lowercase character sets
+* PETSCII control codes, and ways to type them on some keyboards:
    * Ctrl-1 through 8 and Ctrl-Shift-1 through 8 for colors
    * Ctrl-9 and Ctrl-0 for reverse on/off
    * Ctrl-= for HOME
@@ -47,46 +48,46 @@ mostly like they do on the C64:
    * Arrow keys
    * Ctrl-Letter works on 0x10co.de
 * Immediate mode
-* BASIC commands: GOTO, GOSUB, RETURN, PRINT, RUN, CLR, END, ON, NEW,
-                  STOP, REM, IF, FOR, NEXT, DATA, READ, INPUT, GET
-* BASIC functions: ABS, SGN, LEN, INT, LEFT$, RIGHT$, CHR$, ASC, EXP,
-                   SIN, COS, LOG, SPC, MID$, STR$
+* Program entry with line numbers
+* BASIC commands: `GOTO`, `GOSUB`, `RETURN`, `PRINT`, `RUN`, `CLR`, `END`, `ON`, `NEW`,
+                  `STOP`, `REM`, `IF`, `FOR`, `NEXT`, `DATA`, `READ`, `INPUT`, `GET`
+* BASIC functions: `ABS`, `SGN`, `LEN`, `INT`, `LEFT$`, `RIGHT$`, `CHR$`, `ASC`, `EXP`,
+                   `SIN`, `COS`, `LOG`, `SPC`, `MID$`, `STR$`
 * BASIC keyword abbreviations with shifted second letters
-* The ? abbreviation for PRINT
+* The `?` abbreviation for `PRINT`
 * Expressions involving floating-point addition, subtraction,
   and multiplication to 32-bit accuracy.
 * Floating point division to 16-bit accuracy, more for special
   cases like division by 5 or 3.
-* Comparison operators for strings and variables, NOT, AND, and OR.
+* Comparison operators for strings and variables, `NOT`, `AND`, and `OR`.
 * String literals and concatenation.
-* Allocating, setting, and retrieving:
-  * String variables like A$
-  * Float variables like A
-  * Integer variables like A%
+* Allocating, setting, and retrieving all variable types:
+  * String variables like `A$`
+  * Float variables like `A`
+  * Integer variables like `A%`
 * Multi-dimensional arrays for all the above types
 * Garbage collection
-* Functions (DEF FN)
+* Functions (`DEF FN`)
 
 I've put some stub routines in unused commands for testing purposes:
-* LOAD can be used to load a few small demo programs.  Use LOAD
-  by itself to cycle through, or LOAD"$" for a directory.
+* `LOAD` can be used to load a few small demo programs.  Use `LOAD`
+  by itself to cycle through, or `LOAD"$"` for a directory.
   You can then use RUN to execute it, or LIST to see the source code.
-* VERIFY will display a table that describes how program memory
+* `VERIFY` will display a table that describes how program memory
   is currently being used.
 
 Just about anything else won't work, and may even crash the machine.
 Here's what's missing, in the rough order of when I'm going to add it:
-* other functions (VAL, POS, TAB)
-* Program storage (LOAD, SAVE, VERIFY)
-* File access (OPEN, CLOSE, GET, GET#, INPUT#, PRINT#, CMD)
-* 32-bit division (currently the power operator
-    * LOG, power, and TAN depend on this.
-* A stable memory map for POKE, WAIT and PEEK 
-* More trigonometry (TAN, ATN)
-* Special variables ST, TI, TI$
-* a few DCPU-specific uses, like using DIM to allocate memory
+* other functions (`VAL`, `POS`, `TAB`)
+* Program storage (`LOAD`, `SAVE`, `VERIFY`)
+* File access (`OPEN`, `CLOSE`, `GET`, `GET#`, `INPUT#`, `PRINT#`, `CMD`)
+* 32-bit division, which will also fix the inaccurate power operator, `LOG`, and `EXP`.
+* A stable memory map for `POKE`, `WAIT` and `PEEK` 
+* More trigonometry (`TAN`, `ATN`)
+* Special variables `ST`, `TI`, `TI$`
+* a few DCPU-specific uses, like using `DIM` to allocate memory
   for the SPED-3.
-* direct DCPU access with SYS, USR()
+* direct DCPU access with `SYS`, `USR()`
 
 Additionally, the code needs to be optimized and cleaned up.
 Many speed gains are possible, though it may never be as fast
@@ -98,7 +99,8 @@ since the DT IDE crashes on my PC and won't compile on my Mac.
 This program will run on any emulator that handles interrupts
 properly, even 0x10co.de.
 
-I've used the following online resources to make this work:
+Resources
+---------
 
 * Mapping the C64 by Sheldon Leemon, Compute! Publications 1984
    <http://unusedino.de/ec64/technical/project64/mapping_c64.html>
@@ -114,7 +116,8 @@ I've used the following online resources to make this work:
 * ELIZA source code in BASIC:
   <http://everything2.com/title/ELIZA+source+code+in+BASIC>
 
-DISCLAIMER:
+DISCLAIMER
+----------
 
 If your spaceship has this kernal, you will have a bad problem and
 you will not go to space today.  There's a good chance this project
@@ -124,6 +127,9 @@ how thoroughly useful it becomes.  The floating point routines can
 probably be separated, and the BASIC can certainly be separated.
 Screen I/O would probably be faster in an OS that wasn't trying
 so hard to be a Commodore 64.
+
+OTHER LINKS
+-----------
 
 Another promising interpreter for the DCPU-16 is dcpu-admiral,
 which aims to be more Python-like:
