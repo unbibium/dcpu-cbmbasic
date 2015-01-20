@@ -3,7 +3,7 @@ dcpu-cbmbasic
 
 Port of Commodore 64 BASIC and KERNAL to the DCPU-16.
 
-To see it in action, watch this: https://www.youtube.com/watch?v=om-JTv51JqI
+To see it in action, watch the [YouTube demonstration][1].
 
 When I started looking into 0x10c and DCPU-16 programming, I noticed
 there were a few KERNALs but no BASIC interpreter.  I considered
@@ -102,17 +102,14 @@ properly, even 0x10co.de.
 Resources
 ---------
 
-* Mapping the C64 by Sheldon Leemon, Compute! Publications 1984
-   <http://unusedino.de/ec64/technical/project64/mapping_c64.html>
-* C64 ROM disassembly "annotated" -- there were no useful labels
+* [Mapping the C64 by Sheldon Leemon][2], Compute! Publications 1984
+* [C64 ROM disassembly "annotated"][3] -- there were no useful labels
   but there were a few useful comments and the JMP and JSR statements
   were linked.  (I had to save it offline for the links to work though.)
-  <http://www.ffd2.com/fridge/docs/c64-diss.html>
-* Create Your Own Version of Microsoft BASIC for 6502
+* [Create Your Own Version of Microsoft BASIC for 6502][4]
   This has some source code listings that explained things a little
   more thoroughly.  You'll see chunks of comments pasted from here
   in the source.
-  <http://www.pagetable.com/?p=46>
 * ELIZA source code in BASIC:
   <http://everything2.com/title/ELIZA+source+code+in+BASIC>
 
@@ -131,8 +128,11 @@ so hard to be a Commodore 64.
 OTHER LINKS
 -----------
 
-Another promising interpreter for the DCPU-16 is dcpu-admiral,
-which aims to be more Python-like:
-* <https://github.com/orlof/dcpu-admiral>
+Another promising interpreter for the DCPU-16 is [dcpu-admiral][5],
+which aims to be more Python-like.
 
-
+[1]: https://www.youtube.com/watch?v=om-JTv51JqI   "YouTube demonstration"
+[2]: http://unusedino.de/ec64/technical/project64/mapping_c64.html
+[3]: http://www.ffd2.com/fridge/docs/c64-diss.html "C64 ROM disassembly"
+[4]: http://www.pagetable.com/?p=46
+[5]: https://github.com/orlof/dcpu-admiral
