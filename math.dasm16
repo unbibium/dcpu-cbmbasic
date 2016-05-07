@@ -1072,7 +1072,7 @@
 ; location for floating point result
 :FLOATSTR   
             DAT 0x20
-            .FILL 32 0x20
+            .FILL 32, 0x20
 ; output floating point number in FAC1
 :FOUT
 :ROMBDDD    SET Y, FLOATSTR+1

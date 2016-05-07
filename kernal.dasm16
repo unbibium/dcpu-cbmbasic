@@ -4,24 +4,24 @@
 
 ; I'm leaving the last 1/16 of memory for machine language
 ; programs, I guess.
-.DEFINE BASICMEMEND 0xEFFF
+.DEFINE BASICMEMEND, 0xEFFF
 
 ; PETSCII constants
-.DEFINE CBM_STOP 0x03
-.DEFINE CBM_RETURN 0x0D
-.DEFINE CBM_DELETE 0x14
-.DEFINE CBM_INSERT 0x94
-.DEFINE CBM_UP 0x91
-.DEFINE CBM_DOWN 0x11
-.DEFINE CBM_LEFT 0x9D
-.DEFINE CBM_RIGHT 0x1D
-.DEFINE CBM_HOME 0x13
-.DEFINE CBM_CLR 0x93
-.DEFINE CBM_SPACE 0x20
-.DEFINE CBM_QUOTE 0x22
-.DEFINE CBM_COMMA 0x2C
-.DEFINE CBM_COLON 0x3A
-.DEFINE CBM_RUN 0x83
+.DEFINE CBM_STOP, 0x03
+.DEFINE CBM_RETURN, 0x0D
+.DEFINE CBM_DELETE, 0x14
+.DEFINE CBM_INSERT, 0x94
+.DEFINE CBM_UP, 0x91
+.DEFINE CBM_DOWN, 0x11
+.DEFINE CBM_LEFT, 0x9D
+.DEFINE CBM_RIGHT, 0x1D
+.DEFINE CBM_HOME, 0x13
+.DEFINE CBM_CLR, 0x93
+.DEFINE CBM_SPACE, 0x20
+.DEFINE CBM_QUOTE, 0x22
+.DEFINE CBM_COMMA, 0x2C
+.DEFINE CBM_COLON, 0x3A
+.DEFINE CBM_RUN, 0x83
 
 
 :ROMA000    DAT ROME394     ; Vector for starting BASIC
@@ -30,9 +30,9 @@
 ; C64 RAM equivalents
 ;
 
-.INCLUDE "basic.dasm16"
-.INCLUDE "keyboard.dasm16"
-.INCLUDE "screen.dasm16"
+.INCLUDE basic.dasm16
+.INCLUDE keyboard.dasm16
+.INCLUDE screen.dasm16
 
 ; scroll pointer
 :SCPNT  DAT 0
@@ -55,15 +55,15 @@
 ; Notable differences include:
 ;    originally, GOSUB pushed 5 bytes on the stack; now it pushes 3.
 :STACK         
-              .FILL 256 32
+              .FILL 256, BLANK
 :STACKBASEND
-                .FILL 6 32
+                .FILL 6, BLANK
 :STACKEND
 
 
 :RAM0277    ;KEYBOARD BUFFER
 :KEYD
-    .FILL KEYBOARD_BUFFER_SIZE 32
+    .FILL KEYBOARD_BUFFER_SIZE, 32
 
 :RAM01FB  DAT 0
 :RAM01FC  DAT 0
@@ -71,7 +71,7 @@
 :RAM01FE  DAT 0
 :RAM01FF  DAT 0
 :RAM0200  ; String buffer?
-    .FILL BASIC_BUFFER_LENGTH 0
+    .FILL BASIC_BUFFER_LENGTH, 0
 :RAM0281 
 :MEMSTR   ; Start of memory, only used once
         DAT BASICMEM
@@ -106,7 +106,8 @@
 :IIOBASE
 :RAM0318    DAT ROME500
 :IOPEN
-:RAM031A    DAT DEF_OPEN
+:RAM031A    
+            DAT DEF_OPEN
 :ICLOSE
 :RAM031C    DAT DEF_CLOSE
 :ICHKIN
@@ -263,8 +264,8 @@
         RTS
 
 :HEXTHING
-   .FILL 10 48
-   .FILL 6 -9
+   .FILL 10, 48
+   .FILL 6, -9
 :DISPLAY_KEY_DEBUG
         ; debugging code to display some registers every frame
         SET Y, [COUNT]  ; 
@@ -360,7 +361,7 @@
 :CINT
 :ROMFF5B    RTS
 
-.include "io.dasm16"
+.include io.dasm16
 
 ; check for STOP key (probably ESC)
 ; return C=1 if STOP key pressed.
@@ -541,5 +542,5 @@
 :CRASH DAT 0x3000
 
 :BASICMEM     
-        .FILL 10 0 
+        .FILL 10, 0 
 

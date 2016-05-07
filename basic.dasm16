@@ -31,9 +31,9 @@
 :SUBFLG DAT 0
 :RAM11  ; Flag: is data input to GET, READ, or INPUT?
 :INPFLG DAT BLANK
-.DEFINE INF_READ 0x98
-.DEFINE INF_GET 0x40
-.DEFINE INF_INPUT 0x0
+.DEFINE INF_READ, 0x98
+.DEFINE INF_GET, 0x40
+.DEFINE INF_INPUT, 0x0
 :RAM12
 :TANSGN DAT BLANK
 :RAM13 ; Current logical file number
@@ -46,7 +46,7 @@
 :LASTPT DAT 0
 :RAM19 ; Descriptor stack for temporary strings
 :TEMPST
-    .FILL 10 BLANK
+    .FILL 10, BLANK
 :TEMPSTEND
 :RAM22
 :INDEX  DAT BLANK, BLANK
@@ -93,9 +93,9 @@
 :OPPTR  DAT 0
 :RAM4D
 :OPMASK DAT 0
-.DEFINE OPM_LT 1
-.DEFINE OPM_EQ 2
-.DEFINE OPM_GT 4
+.DEFINE OPM_LT, 1
+.DEFINE OPM_EQ, 2
+.DEFINE OPM_GT, 4
 :RAM4E
 :DEFPNT DAT 0
 ;temporary pointer to the current string descriptor
@@ -115,45 +115,45 @@
 :FBUFPT ; Series Evaluation Pointer
 :RAM71  DAT 0
 
-.INCLUDE "chrget.dasm16"
+.INCLUDE chrget.dasm16
 
 ; debugging routine for garbage collector
-.MACRO GARBDEBUG(F)
+;.MACRO GARBDEBUG(F)
             ;SET C, [GARBDISPLAY] 
             ;SET [C], 0x7000
             ;ADD [C], F
             ;ADD [GARBDISPLAY], 1 
-.ENDMACRO
+;.ENDMACRO
 :GARBDISPLAY  DAT SCREENMEM+64
 
 :USRPOK
 :RAM0310    JMP 1234
-.DEFINE RAM0311 USRPOK+1
-.DEFINE USRADD USRPOK+1
+.DEFINE RAM0311, USRPOK+1
+.DEFINE USRADD, USRPOK+1
 
 ; ************* BASIC ROM ************
 
 
 ; some special tokens
-.DEFINE BASIC_FOR_TOKEN 0x81
-.DEFINE BASIC_TO_TOKEN 0xA4
-.DEFINE BASIC_STEP_TOKEN 0xA9
-.DEFINE BASIC_DATA_TOKEN 0x83
-.DEFINE BASIC_GOSUB_TOKEN 0x8D
-.DEFINE BASIC_REM_TOKEN 0x8F
-.DEFINE BASIC_PRINT_TOKEN 0x99
-.DEFINE BASIC_GOTO_TOKEN 0x89
-.DEFINE BASIC_THEN_TOKEN 0xA7
-.DEFINE BASIC_TAB_TOKEN 0xA3
-.DEFINE BASIC_SPC_TOKEN 0xA6
-.DEFINE BASIC_FN_TOKEN 0xA5
-.DEFINE BASIC_NOT_TOKEN 0xA8
-.DEFINE BASIC_EQ_TOKEN 0xB2
-.DEFINE BASIC_GT_TOKEN 0xB1
-.DEFINE BASIC_LEFT_TOKEN 0xC8
-.DEFINE BASIC_SGN_TOKEN 0xB4
-.DEFINE BASIC_MINUS_TOKEN 0xAB
-.DEFINE BASIC_PLUS_TOKEN 0xAA
+.DEFINE BASIC_FOR_TOKEN, 0x81
+.DEFINE BASIC_TO_TOKEN, 0xA4
+.DEFINE BASIC_STEP_TOKEN, 0xA9
+.DEFINE BASIC_DATA_TOKEN, 0x83
+.DEFINE BASIC_GOSUB_TOKEN, 0x8D
+.DEFINE BASIC_REM_TOKEN, 0x8F
+.DEFINE BASIC_PRINT_TOKEN, 0x99
+.DEFINE BASIC_GOTO_TOKEN, 0x89
+.DEFINE BASIC_THEN_TOKEN, 0xA7
+.DEFINE BASIC_TAB_TOKEN, 0xA3
+.DEFINE BASIC_SPC_TOKEN, 0xA6
+.DEFINE BASIC_FN_TOKEN, 0xA5
+.DEFINE BASIC_NOT_TOKEN, 0xA8
+.DEFINE BASIC_EQ_TOKEN, 0xB2
+.DEFINE BASIC_GT_TOKEN, 0xB1
+.DEFINE BASIC_LEFT_TOKEN, 0xC8
+.DEFINE BASIC_SGN_TOKEN, 0xB4
+.DEFINE BASIC_MINUS_TOKEN, 0xAB
+.DEFINE BASIC_PLUS_TOKEN, 0xAA
 
 
 
@@ -224,7 +224,7 @@
             DAT MIDD
 
 ; indexing offset
-.DEFINE FUNCTION_VECTOR FUNCTION_ROUTINES-BASIC_SGN_TOKEN
+.DEFINE FUNCTION_VECTOR, FUNCTION_ROUTINES-BASIC_SGN_TOKEN
 
 
 ; priority and address table
@@ -1863,7 +1863,7 @@
             SET A, 1
             JSR GETSTK
             JSR EVAL ; get a single floating point number
-            GARBDEBUG(0)
+            ;GARBDEBUG(0)
             SET [OPMASK], 0
             ; 
 :ROMADB8    JSR CHRGOT
@@ -2585,9 +2585,9 @@
 ; 1 word for number of dimensions
 ; for each dimension, 1 word for the size of that dimension
 ; then the variable values:
-.DEFINE SIZEOF_INT 1
-.DEFINE SIZEOF_STR 2
-.DEFINE SIZEOF_FLOAT 3
+.DEFINE SIZEOF_INT, 1
+.DEFINE SIZEOF_STR, 2
+.DEFINE SIZEOF_FLOAT, 3
 :MAKE_NEW_ARRAY
 :ROMB261    JSR GETARY
             JSR REASON
@@ -2897,9 +2897,9 @@
 ; Returns original length requested in A
 ; Returns address in X (originally XY)
 ; Single string ptr -- includes variable name and extra byte.
-.DEFINE GARB_LG 5
+.DEFINE GARB_LG, 5
 ; Array pointer -- contains only length and address
-.DEFINE GARB_SM 2
+.DEFINE GARB_SM, 2
 ; The first time through, I was under the impression that
 ; the C64 version cached a lot of zero-page memory, but I
 ; can't seem to find the code that did that.  So I'll just
@@ -3022,11 +3022,11 @@
 ; TO TOP AND GO BACK FOR ANOTHER
 ; ----------------------------------------------------------------------------
 :MOVE_HIGHEST_STRING_TO_TOP
-:ROMB606    GARBDEBUG(0x0D) ; M for MOVE
+:ROMB606    ;GARBDEBUG(0x0D) ; M for MOVE
             ; defpnt isn't getting set 
             IFE [DEFPNT], 0
                 JMP ROMB601
-            GARBDEBUG(0x21) ; ! for actually happening
+            ;GARBDEBUG(0x21) ; ! for actually happening
             SET Y, [RAM55]  ; a cached DSCLEN
             SET I, [DEFPNT] ; contains the address of a descriptor
             IFE Y, GARB_LG  ; is a scalar

@@ -93,11 +93,8 @@ Additionally, the code needs to be optimized and cleaned up.
 Many speed gains are possible, though it may never be as fast
 as the original.  
 
-This program was developed using the DCPU toolchain at
-http://dcputoolcha.in/ -- mostly the command-line tools,
-since the DT IDE crashes on my PC and won't compile on my Mac.
-This program will run on any emulator that handles interrupts
-properly, even 0x10co.de.
+This branch is an experiment to compile the program under
+[paultech's assembler][6].
 
 Resources
 ---------
@@ -136,3 +133,4 @@ which aims to be more Python-like.
 [3]: http://www.ffd2.com/fridge/docs/c64-diss.html "C64 ROM disassembly"
 [4]: http://www.pagetable.com/?p=46
 [5]: https://github.com/orlof/dcpu-admiral
+[6]: https://github.com/paultech/DASM
