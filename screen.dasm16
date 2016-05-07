@@ -318,7 +318,7 @@
                 JMP ROME6C1
             RTS
 :ROME6C1    ; this branch is for when you type past the maximum logical line length
-            IFE [LNMX], (HW_COLS*ROWS_IN_LINE)-1
+            IFE [LNMX], HW_COLS*ROWS_IN_LINE-1
                 JMP ROME6F7  ; just move to next line
             IFN [AUTODN], 0  ; if typing and not just printing
                 JMP ROME967 ; insert blank line underneath
@@ -709,7 +709,7 @@
                 JMP ROME7FE
             IFN Y, [PNTR]
                 JMP ROME805 ; No need to insert a line
-:ROME7FE    IFE Y, (HW_ROWS*ROWS_IN_LINE)-1
+:ROME7FE    IFE Y, HW_COLS*ROWS_IN_LINE-1
                 JMP ROME6A8 ; do nothing; can't expand further
 :ROME802    JSR ROME965 ; Insert a line below the current line
 :ROME805    SET PUSH, I

@@ -818,10 +818,10 @@
 :ROMA5D4    SUB A, CBM_COLON
             IFE A, 0
                 JMP ROMA5DC
-            IFN A, (BASIC_DATA_TOKEN-CBM_COLON) ; DATA token
+            IFN A, BASIC_DATA_TOKEN-CBM_COLON ; DATA token
                 JMP ROMA5DE
 :ROMA5DC    SET [RAM0F], A ; Set quote mode ON for DATA
-:ROMA5DE    IFN A, (BASIC_REM_TOKEN-CBM_COLON) 
+:ROMA5DE    IFN A, BASIC_REM_TOKEN-CBM_COLON
                 JMP ROMA582 ; just move to next character
             SET [ENDCHR], 0 
             ; Copy characters literally until either
