@@ -40,7 +40,7 @@
 .DEFINE DL_UNLINKED, 0x80
 :LDTB1
 :RAMD9
-    .FILL HW_ROWS+1, DL_UNLINKED
+    .FILL DL_UNLINKED, HW_ROWS+1
 :RAM0287
 :GDCOL  DAT 0xe620
 :RAM0288
@@ -58,7 +58,7 @@
 :RAM02A5    DAT 0
 
 :SCREENMEM    
-               .FILL HW_COLS*HW_ROWS, BLANK
+            .FILL BLANK,  HW_COLS*HW_ROWS
 :SCREENMEMEND
 ; when HW_ROWS < 12, the bottom line displays
 ; various debugging information.
@@ -67,18 +67,17 @@
 ; debug keyboard I/O
           DAT 0xA00B, 0xA03A ; "K:"
 :DEBUGKEY
-          .FILL 10, BLANK
+          .FILL BLANK, 10
 ; debug line link tbl
         DAT 0xA00C, 0xA03A ; "L:" 
 :DEBUGLNK 
-        .FILL 14, BLANK
+        .FILL BLANK, 14
 ; debug vblank interrupt
           DAT 0xA009, 0xA03A; "I:"
 :DEBUGINT
-          .FILL 6, BLANK
+          .FILL BLANK, 6
 
-          .FILL HW_COLS-29, 0xA02E
-
+          .FILL 0xA02E, HW_COLS-29
 
 ; get screen geometry
 :DEF_SCREEN
@@ -865,7 +864,7 @@
     RTS
 
 :VISFONT    
-    .FILL 256, BLANK
+    .FILL BLANK, 256
 :COMGFX
     DAT 0, 0  ; shift-space
     DAT 0xFFFF, 0x00 ; left block
@@ -943,10 +942,10 @@
     DAT 0x7030, 0x0C03  
 ; XOR masks to toggle uppercase-lowercase
 :FONTXOR1
-    .FILL 52, BLANK
+    .FILL BLANK, 52
 ; XOR masks to toggle graphics-uppercase 
 :FONTXOR2
-    .FILL 52, BLANK
+    .FILL BLANK, 52
 
 :CBM_PALETTE
     DAT 0x000, 0xfff, 0xf00, 0x0ff

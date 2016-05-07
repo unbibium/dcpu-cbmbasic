@@ -46,7 +46,7 @@
 :LASTPT DAT 0
 :RAM19 ; Descriptor stack for temporary strings
 :TEMPST
-    .FILL 10, BLANK
+    .FILL BLANK, 10
 :TEMPSTEND
 :RAM22
 :INDEX  DAT BLANK, BLANK

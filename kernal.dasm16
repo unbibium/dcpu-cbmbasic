@@ -55,15 +55,15 @@
 ; Notable differences include:
 ;    originally, GOSUB pushed 5 bytes on the stack; now it pushes 3.
 :STACK         
-              .FILL 256, BLANK
+              .FILL BLANK, 256
 :STACKBASEND
-                .FILL 6, BLANK
+                .FILL BLANK, 6
 :STACKEND
 
 
 :RAM0277    ;KEYBOARD BUFFER
 :KEYD
-    .FILL KEYBOARD_BUFFER_SIZE, 32
+    .FILL 32, KEYBOARD_BUFFER_SIZE
 
 :RAM01FB  DAT 0
 :RAM01FC  DAT 0
@@ -71,7 +71,7 @@
 :RAM01FE  DAT 0
 :RAM01FF  DAT 0
 :RAM0200  ; String buffer?
-    .FILL BASIC_BUFFER_LENGTH, 0
+    .FILL 0, BASIC_BUFFER_LENGTH
 :RAM0281 
 :MEMSTR   ; Start of memory, only used once
         DAT BASICMEM
@@ -264,8 +264,8 @@
         RTS
 
 :HEXTHING
-   .FILL 10, 48
-   .FILL 6, -9
+   .FILL 48, 10
+   .FILL -9, 6
 :DISPLAY_KEY_DEBUG
         ; debugging code to display some registers every frame
         SET Y, [COUNT]  ; 
@@ -542,5 +542,5 @@
 :CRASH DAT 0x3000
 
 :BASICMEM     
-        .FILL 10, 0 
+        .FILL 0, 10
 
