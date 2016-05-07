@@ -133,4 +133,4 @@ which aims to be more Python-like.
 [3]: http://www.ffd2.com/fridge/docs/c64-diss.html "C64 ROM disassembly"
 [4]: http://www.pagetable.com/?p=46
 [5]: https://github.com/orlof/dcpu-admiral
-[6]: https://github.com/paultech/DASM
+[6]: https://github.com/techcompliant/DASM
