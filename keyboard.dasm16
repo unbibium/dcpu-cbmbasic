@@ -89,7 +89,7 @@
     ;    SET [KEYASCII], 0
     SET C, POP
     SET B, POP
-    RFI
+    RFI 5
 
 ; 0x10co.de + chrome gives us strange keystrokes
 ; where it adds 0x80 to them. this fixes most of them

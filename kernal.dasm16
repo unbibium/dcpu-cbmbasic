@@ -243,7 +243,7 @@
             SET Y, POP
             SET X, POP
             SET EX, POP
-            RFI
+            RFI -1
 
 ; I appropriated this to display another
 ; chunk of memory in the status bar.
@@ -430,7 +430,7 @@
     IFE A, KEYINT
         JMP KEYINT
         ;ignore all others
-    RFI
+    RFI 10
 
 :CLOCKINT
     SET PUSH, EX
@@ -482,7 +482,7 @@
 
 ; Standard NMI routine stub
 :ROMFE47   ;???
-           RFI
+           RFI 9001
 
 ; BRK routine
 
