@@ -4,7 +4,7 @@
 
 ; I'll petition Notch to make these mnemonics standard
 ; once I have all my ducks in a row.
-MACRO JMP = SET PC,
+MACRO JMP = SET PC, %0
 MACRO RTS = SET PC, POP
 
 JMP [ROMFFFC]   ; RESET vector
