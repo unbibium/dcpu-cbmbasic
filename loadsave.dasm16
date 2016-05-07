@@ -1,7 +1,4 @@
-.MACRO DO_A(aSub, anArg)
-      SET A, anArg
-      JSR aSub
-.ENDMACRO
+.MACRO DO_A = SET A, %0 %n JSR aSub
 
 ; stub for loading a demo from another part of RAM
 :STMT_LOAD
@@ -75,45 +72,45 @@
 ; Not the real verify command but allows me to see
 ; various memory sizes at a glance
     ; display basic text size
-        DO_A(STROUT, TXT_H)
-        DO_A(LINPRT, [TXTTAB])
-        DO_A(CHROUT, 32)
+        DO_A STROUT, TXT_H 
+        DO_A LINPRT, [TXTTAB] 
+        DO_A CHROUT, 32 
         SET A, [VARTAB]
         SUB A, [TXTTAB]
         JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
+        DO_A CHROUT, CBM_RETURN 
     ; display scalar variable size
-        DO_A(STROUT, VAR_H)
-        DO_A(LINPRT, [VARTAB])
-        DO_A(CHROUT, 32)
+        DO_A STROUT, VAR_H 
+        DO_A LINPRT, [VARTAB] 
+        DO_A CHROUT, 32 
         SET A, [ARYTAB]
         SUB A, [VARTAB]
         JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
+        DO_A CHROUT, CBM_RETURN 
     ; display array variable size
-        DO_A(STROUT, ARY_H)
-        DO_A(LINPRT, [ARYTAB])
-        DO_A(CHROUT, 32)
+        DO_A STROUT, ARY_H 
+        DO_A LINPRT, [ARYTAB] 
+        DO_A CHROUT, 32 
         SET A, [STREND]
         SUB A, [ARYTAB]
         JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
+        DO_A CHROUT, CBM_RETURN 
     ; display free space size
-        DO_A(STROUT, FREE_H)
-        DO_A(LINPRT, [STREND])
-        DO_A(CHROUT, 32)
+        DO_A STROUT, FREE_H 
+        DO_A LINPRT, [STREND] 
+        DO_A CHROUT, 32 
         SET A, [FREETOP]
         SUB A, [STREND]
         JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
+        DO_A CHROUT, CBM_RETURN 
     ; display string size
-        DO_A(STROUT, STR_H)
-        DO_A(LINPRT, [FREETOP])
-        DO_A(CHROUT, 32)
+        DO_A STROUT, STR_H 
+        DO_A LINPRT, [FREETOP] 
+        DO_A CHROUT, 32 
         SET A, [MEMSIZ]
         SUB A, [FREETOP]
         JSR LINPRT
-        DO_A(CHROUT, CBM_RETURN)
+        DO_A CHROUT, CBM_RETURN 
         RTS
 
 :TXT_H  DAT "TXT: ", 0
