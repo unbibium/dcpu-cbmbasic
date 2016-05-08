@@ -392,7 +392,7 @@
               JSR RESTOR 
               JSR CINT   
               IAQ 0 ;CLI
-              JMP [ROMA000]  ; START BASIC              
+              JMP_IND ROMA000  ; START BASIC              
 
 ; restore I/O vectors
 ; this isn't necessary because the I/O vectors are assembled in
@@ -436,7 +436,7 @@
     SET PUSH, EX
     SET PUSH, X
     SET PUSH, Y
-    JMP [RAM0314]
+    JMP_IND RAM0314
 :clock_interrupt_message
         DAT ROMEA31
 
@@ -478,7 +478,7 @@
 
 ; NMI entry stub
 :ROMFE43   ; SEI
-           JMP [RAM0318]
+           JMP_IND RAM0318
 
 ; Standard NMI routine stub
 :ROMFE47   ;???
@@ -489,25 +489,25 @@
 :ROMFE66     JSR RESTOR
 :ROMFE69     JSR IOINIT
 :ROMFE6C     JSR ROME518 ; initialize screen and keyboard
-:ROMFE6F     JMP [ROMA002]
+:ROMFE6F     JMP_IND ROMA002
 
 ; skipping a lot of file i/o-related kernal for now
 
 :ROMFFB7    JMP ROMFE07
 :OPEN
-:ROMFFC0  JMP [RAM031A]   ; (F34A) open a file
+:ROMFFC0  JMP_IND RAM031A   ; (F34A) open a file
 :CLOSE
-:ROMFFC3  JMP [RAM031C]   ; (F291) close a file
+:ROMFFC3  JMP_IND RAM031C   ; (F291) close a file
 :CHKIN
-:ROMFFC6  JMP [RAM031E]   ; (F20E) set input device
+:ROMFFC6  JMP_IND RAM031E   ; (F20E) set input device
 :CHKOUT
-:ROMFFC9  JMP [RAM0320]   ; (F250) set output device
+:ROMFFC9  JMP_IND RAM0320   ; (F250) set output device
 :CLRCHN
-:ROMFFCC  JMP [RAM0322]   ; (F333) restore I/O devices to default
+:ROMFFCC  JMP_IND RAM0322   ; (F333) restore I/O devices to default
 :CHRIN
-:ROMFFCF  JMP [ICHRIN]   ; (F157) input char on current device
+:ROMFFCF  JMP_IND ICHRIN   ; (F157) input char on current device
 :CHROUT
-:ROMFFD2  JMP [ICHROUT]   ; (F1CA) output char on current device
+:ROMFFD2  JMP_IND ICHROUT   ; (F1CA) output char on current device
 :LOAD
 :ROMFFD5  JMP DEF_LOAD      ; load RAM from device
 :SAVE
@@ -517,11 +517,11 @@
 :RDTIM
 :ROMFFDE  JMP ROMF6DD      ; read real time clock
 :STOP
-:ROMFFE1  JMP [ISTOP]    ; (F6ED) check stop key
+:ROMFFE1  JMP_IND ISTOP    ; (F6ED) check stop key
 :GETIN
-:ROMFFE4  JMP [IGETIN]    ; (F13E) get a character
+:ROMFFE4  JMP_IND IGETIN    ; (F13E) get a character
 :CLALL
-:ROMFFE7  JMP [ICLALL]    ; (F32F) close all channels and files
+:ROMFFE7  JMP_IND ICLALL    ; (F32F) close all channels and files
 :UDTIM
 :ROMFFEA  JMP DEF_UDTIM   ; increment real time clock
 :SCREEN

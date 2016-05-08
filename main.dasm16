@@ -5,9 +5,10 @@
 ; I'll petition Notch to make these mnemonics standard
 ; once I have all my ducks in a row.
 MACRO JMP = SET PC, %0
+MACRO JMP_IND = SET PC, [%0]
 MACRO RTS = SET PC, POP
 
-JMP [ROMFFFC]   ; RESET vector
+JMP_IND ROMFFFC   ; RESET vector
 
 ; config.dasm16 is mostly useful for setting up
 ; test parameters.
