@@ -1,4 +1,4 @@
-.MACRO DO_A = SET A, %0 %n JSR aSub
+.MACRO DO_A = SET A, %1 %n JSR %0
 
 ; stub for loading a demo from another part of RAM
 :STMT_LOAD
