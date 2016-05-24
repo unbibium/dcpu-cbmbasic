@@ -1799,7 +1799,7 @@
 :ROMAD42    SET A, SP
             ADD A, 2   ; pointer to STEP value
             JSR MOVFM  ; set FAC1
-            SET [FACSGN], PICK 5
+            SET [FACSGN], [SP+5]
 :ROMAD4B    SET A, [FORPNT] ; pointer to loop variable
 :ROMAD4F    JSR FADD        ; add to STEP value
             JSR ROMBBD0     ; set loop variable to result
@@ -1807,11 +1807,11 @@
             ADD A, 6   ; pointer to TO value
             JSR FCOMP ; compare TO value (I) with loop variable
             ; break out if comparison matches sign of STEP
-            IFE A, PICK 5
+            IFE A, [SP+5]
                 JMP ROMAD78
 :ROMAD61    ; last time through loop
-            SET [CURLIN], PICK 9
-            SET [RAM7A], PICK 10
+            SET [CURLIN], [SP+9]
+            SET [RAM7A], [SP+10]
 :ROMAD75    JMP NEWSTT
             ; end of loop
 :ROMAD78    ADD SP, 11    ; pop FOR block from stack
@@ -2521,10 +2521,10 @@
             SET Y, POP
             ; insert address 2 back in stack
 :ROMB1EE    SET B, PEEK
-            SET C, PICK 1
+            SET C, [SP+1]
             SET PUSH, B
-            SET PICK 1, C
-            SET PICK 2, [RAM64]
+            SET [SP+1], C
+            SET [SP+2], [RAM64]
             ADD Y, 1 ; Increase dimension
             JSR CHRGOT
             IFE A, CBM_COMMA
