@@ -1,4 +1,5 @@
 .MACRO DO_A = SET A, %1 %n JSR %0
+.MACRO PRINT_PEEK = SET A, [%0] %n JSR LINPRT
 
 ; stub for loading a demo from another part of RAM
 :STMT_LOAD
@@ -73,7 +74,7 @@
 ; various memory sizes at a glance
     ; display basic text size
         DO_A STROUT, TXT_H 
-        DO_A LINPRT, [TXTTAB] 
+        PRINT_PEEK TXTTAB
         DO_A CHROUT, 32 
         SET A, [VARTAB]
         SUB A, [TXTTAB]
@@ -81,7 +82,7 @@
         DO_A CHROUT, CBM_RETURN 
     ; display scalar variable size
         DO_A STROUT, VAR_H 
-        DO_A LINPRT, [VARTAB] 
+        PRINT_PEEK VARTAB 
         DO_A CHROUT, 32 
         SET A, [ARYTAB]
         SUB A, [VARTAB]
@@ -89,7 +90,7 @@
         DO_A CHROUT, CBM_RETURN 
     ; display array variable size
         DO_A STROUT, ARY_H 
-        DO_A LINPRT, [ARYTAB] 
+        PRINT_PEEK ARYTAB
         DO_A CHROUT, 32 
         SET A, [STREND]
         SUB A, [ARYTAB]
@@ -97,7 +98,7 @@
         DO_A CHROUT, CBM_RETURN 
     ; display free space size
         DO_A STROUT, FREE_H 
-        DO_A LINPRT, [STREND] 
+        PRINT_PEEK STREND
         DO_A CHROUT, 32 
         SET A, [FREETOP]
         SUB A, [STREND]
@@ -105,7 +106,7 @@
         DO_A CHROUT, CBM_RETURN 
     ; display string size
         DO_A STROUT, STR_H 
-        DO_A LINPRT, [FREETOP] 
+        PRINT_PEEK FREETOP
         DO_A CHROUT, 32 
         SET A, [MEMSIZ]
         SUB A, [FREETOP]
