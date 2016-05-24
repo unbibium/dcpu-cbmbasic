@@ -588,7 +588,7 @@
 
 ; handle error messages
 :ERROR
-:ROMA437     JMP [IERROR]   ; snall detour in the kernal
+:ROMA437     JMP_IND IERROR   ; snall detour in the kernal
 :BASIC_ERROR
 :ROMA43A     SET [INDEX], [ROMA326+X]
              JSR CLRCHN
@@ -620,7 +620,7 @@
 :ROMA47D     JSR SETMSG
 ; main loop
 :MAIN
-:ROMA480    JMP [IMAIN] ; normally ROMA483
+:ROMA480    JMP_IND IMAIN ; normally ROMA483
 :DEF_MAIN
 :ROMA483    
             ; debugging is useful
@@ -639,7 +639,7 @@
 :ROMA48A    JSR CHRGET 
 :ROMA48D    SET X, A ; TAX
 :ROMA48E    IFE A, 0  ; BEQ $A480 
-                JMP [IMAIN]   ; which was this JMP
+                JMP_IND IMAIN   ; which was this JMP
             SET [CURLIN], -1 ; enter immediate mode
             IFE C, 0 ; begins with a digit
                JMP MAIN1 ; add line to program
@@ -700,7 +700,7 @@
                 JMP ROMA522L
 :ROMA52A    JSR SETPTRS ; clr?
             JSR FIX_LINKS
-            JMP [IMAIN]
+            JMP_IND IMAIN
 
 ; ----------------------------------------------------------------------------
 ; CLEAR ALL VARIABLES
@@ -762,7 +762,7 @@
 ; That is why everything indexed from [RAM01FE] instead of [RAM0200]
 ; directly, and why everything in the 6502 version indexed from $01FC.
 :CRUNCH
-:ROMA579    JMP [ICRNCH]
+:ROMA579    JMP_IND ICRNCH
 :DEF_CRUNCH
 :ROMA57C    SET X, [RAM7A] 
             SET Y, 2    ; first two characters are taken up by link &c
@@ -986,7 +986,7 @@
 
 ; Standard Token Printer
 :QPLOP
-:ROMA717    JMP [IQPLOP]
+:ROMA717    JMP_IND IQPLOP
 :DEF_QPLOP
 :ROMA71A    IFL A, 0x80 ; Low ASCII
                 JMP ROMA6F3   ; print literal
@@ -1090,7 +1090,7 @@
             ADD Z, 2  ; get new current line number
             SET [CURLIN], [Z]
             SET [RAM7A], Z
-:ROMA7E1    JMP [RAM0308]   ; normally A7E4
+:ROMA7E1    JMP_IND RAM0308   ; normally A7E4
 
 :GONE    ; execute a statement
 :ROMA7E4    JSR CHRGET    ; get token into A
@@ -1697,7 +1697,7 @@
 :ROMAC41    IFE [INPFLG], INF_READ
                 JMP ROMACB8
             IFN [CHANNL], 0
-                JMP [ROMAC4A]
+                JMP_IND ROMAC4A
             JSR OUTQUES ; print question mark
 :ROMAC4A    JSR NXIN ; get line into input buffer
 :ROMAC4D    SET [RAM7A], X
@@ -2021,7 +2021,7 @@
 ; a number or variable name, from 
 ; ASCII text to a floating point number
 :EVAL
-:ROMAE83    JMP [RAM030A]
+:ROMAE83    JMP_IND RAM030A
 :DEF_EVAL
 :ROMAE86    SET [VALTYP], 0   ; numeric
 :ROMAE8A    JSR CHRGET
@@ -3286,7 +3286,7 @@
 
 :ROME386
             SET X, 0x80
-            JMP [IERROR] ;normally E38B
+            JMP_IND IERROR ;normally E38B
 :DEF_ERROR    
 :ROME38B ; error message handler
             IFG X, 0x7F
