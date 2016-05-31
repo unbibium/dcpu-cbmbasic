@@ -6,6 +6,12 @@
 ;  TODO: add list of kernal dependencies.
 ;
 ;
+.DEFINE ASCII_COLON 0x3A
+.DEFINE ASCII_SPACE 0x20
+.DEFINE ASCII_CR    0x0D
+.DEFINE ASCII_QUOTE 0x22
+.DEFINE ASCII_COMMA 0x2C
+;
 :RAM03  
 :ADRAY1 DAT BLANK
 :RAM05  
@@ -484,7 +490,7 @@
 
 ; ok
 
-:ROMA364   DAT CBM_RETURN, "OK", CBM_RETURN
+:ROMA364   DAT ASCII_CR, "OK", ASCII_CR
 :ROMA368   DAT 0
 
 ; error
@@ -499,12 +505,12 @@
 
 ; ready.
 
-:ROMA376   DAT CBM_RETURN, "READY.", CBM_RETURN
+:ROMA376   DAT ASCII_CR, "READY.", ASCII_CR
 :ROMA380   DAT 0
 
 ; break
 
-:ROMA381   DAT CBM_RETURN,0x0A
+:ROMA381   DAT ASCII_CR,0x0A
 
 :ROMA383   DAT "BREAK"
 
@@ -726,7 +732,7 @@
 :INLIN
 :ROMA560    SET X, 0
 :ROMA562    JSR ROME112   ; GETIN -> ROMF157
-            IFE A, CBM_RETURN 
+            IFE A, ASCII_CR 
                 JMP ROMAACA ; mark end and return
             SET [RAM0200+X], A
             ADD X, 1
@@ -742,9 +748,9 @@
             ;JSR CHROUT
             ;SET A, HW_COLS*ROWS_IN_LINE
             ;JSR LINPRT
-            SET A, CBM_RETURN
+            SET A, ASCII_CR
             JSR CHROUT
-            SET A, CBM_RETURN
+            SET A, ASCII_CR
             JSR CHROUT
 
 :LTLERR
@@ -774,10 +780,10 @@
                 JMP ROMA5C9
             ADD X, 1
             JMP ROMA582 ; ignore, go to next
-:ROMA58E    IFE A, CBM_SPACE
+:ROMA58E    IFE A, ASCII_SPACE
                 JMP ROMA5C9
             SET [ENDCHR], A
-            IFE A, CBM_QUOTE
+            IFE A, ASCII_QUOTE
                 JMP ROMA5EE ; skip to next quote
             IFB [RAM0F], 0x40 ; BVS
                 JMP ROMA5C9 ; Quote mode for DATA statement
@@ -815,13 +821,13 @@
             SET [RAM01FD+Y], A
             IFE A, 0  ; end of line
                 JMP ROMA609
-:ROMA5D4    SUB A, CBM_COLON
+:ROMA5D4    SUB A, ASCII_COLON
             IFE A, 0
                 JMP ROMA5DC
-            IFN A, (BASIC_DATA_TOKEN-CBM_COLON) ; DATA token
+            IFN A, (BASIC_DATA_TOKEN-ASCII_COLON) ; DATA token
                 JMP ROMA5DE
 :ROMA5DC    SET [RAM0F], A ; Set quote mode ON for DATA
-:ROMA5DE    IFN A, (BASIC_REM_TOKEN-CBM_COLON) 
+:ROMA5DE    IFN A, (BASIC_REM_TOKEN-ASCII_COLON) 
                 JMP ROMA582 ; just move to next character
             SET [ENDCHR], 0 
             ; Copy characters literally until either
@@ -965,12 +971,12 @@
             SET [FORPNT], Y
 :ROMA6EA    SET A, [Y]
             JSR LINPRT
-            SET A, CBM_SPACE ; space following line number
+            SET A, ASCII_SPACE ; space following line number
 :ROMA6EF    SET Y, [FORPNT]
 :ROMA6F1    AND A, 0x7F ; filter high bit if coming from QPLOP
             ; loop to print a line
 :ROMA6F3    JSR ROMAB47 ; print character
-            IFE A, CBM_QUOTE
+            IFE A, ASCII_QUOTE
             XOR [RAM0F], -1 ; enter quote mode
             ADD Y, 1
             ;IFE Y, 0  ; what, stop after 256 characters?
@@ -1109,7 +1115,7 @@
             SET PUSH, [TOKEN_ROUTINES+A] ; get address of next command
             JMP CHRGET
             ; will return to STMT_* with next character in A, C, Z.
-:ROMA807    IFE A, CBM_COLON
+:ROMA807    IFE A, ASCII_COLON
                 JMP ROMA7E1
             JMP SNERR
             ; handle "GO TO" with a space in it
@@ -1244,7 +1250,7 @@
 ; There's a way to use registers instead of ENDCHR and CHARAC,
 ; but when I try, program entry breaks somehow.
 :DATAN
-:ROMA906    SET [CHARAC], CBM_COLON   ; get next statement
+:ROMA906    SET [CHARAC], ASCII_COLON   ; get next statement
             IFE 1, 0 ; skip
 :REMN
 :ROMA909    SET [CHARAC], 0           ; get end of line
@@ -1262,7 +1268,7 @@
 :ROMA91D    IFE A, [ENDCHR]
                 RTS
             ADD I, 1
-            IFE A, CBM_QUOTE ; quote mark
+            IFE A, ASCII_QUOTE ; quote mark
                 JMP ROMA911
             JMP ROMA919
 
@@ -1303,7 +1309,7 @@
             JMP ROMA7EF ; evaluate as if a stand-alone command
 :ROMA95F    JSR CHRGET  
             JSR LINGET  ; consume and discard line number
-            IFE A, CBM_COMMA
+            IFE A, ASCII_COMMA
             JMP ROMA957
             SET A, POP ; past end of list; do nothing.
             RTS         
@@ -1442,7 +1448,7 @@
 :ROMAA86    JSR GETBYT
             IFE Z, 1  ; i think it ends in CHRGOT
                 JMP ROMAA90
-            SET A, CBM_COLON
+            SET A, ASCII_COLON
             JSR SYNCHR
 :ROMAA90    SET PUSH, Z
             SET X, [CHANNL]
@@ -1463,7 +1469,7 @@
             SET C, 0
             IFE A, BASIC_SPC_TOKEN   ; SPC(
                 JMP ROMAAF8
-            IFE A, CBM_COMMA
+            IFE A, ASCII_COMMA
                 JMP ROMAAE8
             IFE A, 0x3B ; SEMICOLON
                 JMP ROMAB13
@@ -1487,7 +1493,7 @@
 
 ; RETURN at end of line on PRINT
 :ROMAAD7 
-            SET A, CBM_RETURN  
+            SET A, ASCII_CR  
             JSR ROMAB47
             IFC [CHANNL], 0x80
                 JMP ROMAAE5
@@ -1550,7 +1556,7 @@
             SET A, [Y]      ; character to A
             JSR ROMAB47 ; print 1 character
             ADD Y, 1
-            IFN A, CBM_RETURN  ; cr?
+            IFN A, ASCII_CR  ; cr?
                 JMP ROMAB28
 :ROMAB35    JSR ROMAAE5  ; write RETURN
             JMP ROMAB28
@@ -1564,7 +1570,7 @@
                 JMP ROMAB42
 :ROMAB3F    SET A, 0x20   ; space
             IFE A, -1 ; skip next
-:ROMAB42    SET A, CBM_RIGHT   
+:ROMAB42    SET A, 0x1D   ; CBM cursor-right?   
             IFE A, -1 ; skip next
 :OUTQUES
 :ROMAB45    SET A, 0x3F  ; question mark
@@ -1603,7 +1609,7 @@
 			    JMP LC486
 			JSR CHRGET
 			JSR GETBYT
-			SET A, CBM_COMMA
+			SET A, ASCII_COMMA
 			JSR SYNCHR
 			JSR CHKIN
 			SET [CHANNL], X
@@ -1618,7 +1624,7 @@
 
 :STMT_INPUTN
 :ROMABA5    JSR GETBYT
-            SET A, CBM_COMMA
+            SET A, ASCII_COMMA
             JSR SYNCHR
             SET [CHANNL], X
             JSR ROME11E   ; CHKIN
@@ -1630,7 +1636,7 @@
 
 :STMT_INPUT
 :ROMABBF    SET C, 0
-            IFN A, CBM_QUOTE 
+            IFN A, ASCII_QUOTE 
                 JMP ROMABCE
             ; handle INPUT "PROMPT";A$
 :ROMABC3    SET C, 1
@@ -1639,7 +1645,7 @@
             JSR SYNCHR  ; finish consuming string
             JSR ROMAB21
 :ROMABCE    JSR ERRDIR ; handle illegal use in direct mode
-:ROMABD1    SET A, CBM_COMMA
+:ROMABD1    SET A, ASCII_COMMA
             SET [RAM01FF], A
 :ROMABD6    JSR NXIN ; get line into input buffer
             IFE [CHANNL], 0
@@ -1714,10 +1720,10 @@
             JMP ROMAC71
 :ROMAC65    SET [CHARAC], A
             SET EX, 1 ; add 1 to address if quote matches
-            IFE A, CBM_QUOTE
+            IFE A, ASCII_QUOTE
                 JMP ROMAC72
-            SET [CHARAC], CBM_COLON
-            SET A, CBM_COMMA
+            SET [CHARAC], ASCII_COLON
+            SET A, ASCII_COMMA
 :ROMAC71    SET EX, 0
 :ROMAC72    SET [ENDCHR], A
             SET A, [RAM7A]
@@ -1733,7 +1739,7 @@
 :ROMAC91    JSR CHRGOT
             IF_NEXT_STMT
                 JMP ROMAC9D
-            IFE A, CBM_COMMA ; end of variable
+            IFE A, ASCII_COMMA ; end of variable
                 JMP ROMAC9D
             JMP INPUTERR ; process input errors
 :ROMAC9D    SET [INPPTR], [RAM7A]
@@ -1775,10 +1781,10 @@
 
 :EXIGNT
 :ROMACFC
-    DAT "?EXTRA IGNORED", CBM_RETURN, 0
+    DAT "?EXTRA IGNORED", ASCII_CR, 0
 :REDOMSG
 :ROMAD0C
-    DAT "?REDO FROM START", CBM_RETURN, 0
+    DAT "?REDO FROM START", ASCII_CR, 0
 
 ; NEXT statement - see STMT_FOR
 :STMT_NEXT
@@ -1816,7 +1822,7 @@
             ; end of loop
 :ROMAD78    ADD SP, 11    ; pop FOR block from stack
             JSR CHRGOT
-:ROMAD80    IFN A, CBM_COMMA
+:ROMAD80    IFN A, ASCII_COMMA
                 JMP NEWSTT
             JSR CHRGET   ; it's NEXT X,Y -- do NEXT Y also
             JSR ROMAD24  ; must JSR so that the POP works.
@@ -2044,10 +2050,10 @@
                 JMP ROMAF0D
             IFE A, BASIC_PLUS_TOKEN
                 JMP ROMAE8A
-            IFN A, CBM_QUOTE ; quote mark
+            IFN A, ASCII_QUOTE ; quote mark
                 JMP ROMAECC
             SET C, 0
-            IFG A, CBM_QUOTE-1 ; carry over from 6502 CMP above
+            IFG A, ASCII_QUOTE-1 ; carry over from 6502 CMP above
                 SET C, 1 
 ; remember to set C before jumping here.
 ; this entry point consumes a string in quotes.
@@ -2095,7 +2101,7 @@
 :ROMAEFA    SET A, 0x28  ; open paren
             JMP SYNCHR
 :CHKCOM
-:ROMAEFD    SET A, CBM_COMMA
+:ROMAEFD    SET A, ASCII_COMMA
 ; Next non-whitespace character should be A,
 ; otherwise it's a syntax error.
 :SYNCHR
@@ -2527,7 +2533,7 @@
             SET PICK 2, [RAM64]
             ADD Y, 1 ; Increase dimension
             JSR CHRGOT
-            IFE A, CBM_COMMA
+            IFE A, ASCII_COMMA
                 JMP ROMB1DB
             SET [COUNT], Y
             JSR CHKCLS
@@ -2807,7 +2813,7 @@
 ; stores length in [RAM61]
 ; stores address in [RAM62]
 :STRLIT
-:ROMB487    SET X, CBM_QUOTE ; quote
+:ROMB487    SET X, ASCII_QUOTE ; quote
             SET [CHARAC], X
             SET [ENDCHR], X
 ; enter here if CHARAC and ENDCHR aren't quotes
@@ -2830,7 +2836,7 @@
 :ROMB4A8    
 :ROMB4A9    SET Y, I         ; subtract original pointer
             SUB Y, [RAM6F]   ; to obtain the length
-            IFE A, CBM_QUOTE 
+            IFE A, ASCII_QUOTE 
                 ADD I, 1     ; put end past trailing quote
             SET [RAM61], Y  ; Length in [RAM61]
             SET [RAM71], I  ;originally had to add Y to RAM6F
@@ -3353,14 +3359,14 @@
 ; startup messages
 
 :WORDS      DAT " BASIC BYTES FREE"
-            DAT CBM_RETURN, 0
-:ROME473    DAT CBM_CLR ;to clear the screen
+            DAT ASCII_CR, 0
+:ROME473    DAT 0x93 ;to clear the screen
             DAT 0x99 ; light green
             DAT "DCPU-16 BASIC "
             DAT 0x90 ; black
             DAT "ALPHA"
             DAT 0x9A ; light blue
-            DAT CBM_RETURN
+            DAT ASCII_CR
             DAT 0
 :ROME4AC    DAT 0x81
 

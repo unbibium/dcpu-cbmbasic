@@ -9,9 +9,17 @@
 
 JMP [ROMFFFC]   ; RESET vector
 
+; I'm leaving the last 1/16 of memory for machine language
+; programs, I guess.
+.DEFINE BASICMEMEND 0xEFFF
+
 ; config.dasm16 is mostly useful for setting up
 ; test parameters.
 .INCLUDE "config.dasm16"
 
 ; kernal.dasm16 will link in all the ROM content
+; TODO: provide list of labels kernal must provide
 .INCLUDE "kernal.dasm16"
+
+; BASIC rom
+.INCLUDE "basic.dasm16"

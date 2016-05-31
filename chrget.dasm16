@@ -21,11 +21,11 @@
 :RAM7A      DAT 0x0800
             SET C, 1
             SET Z, 0
-            IFE A, CBM_COLON
+            IFE A, ASCII_COLON
                 SET Z, 1  ; return Z=1 for end of statement
             IFG A, 0x39  ; Not a digit or space
                 RTS      ; return C=1
-:RAM0080    IFE A, CBM_SPACE ; Space
+:RAM0080    IFE A, ASCII_SPACE ; Space
             JMP CHRGET  ; skip to next character
             SET C, 0
             IFL A, 0x30  ; Is a digit

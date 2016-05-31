@@ -2,10 +2,6 @@
 ;  KERNAL MAIN
 ;----------------
 
-; I'm leaving the last 1/16 of memory for machine language
-; programs, I guess.
-.DEFINE BASICMEMEND 0xEFFF
-
 ; PETSCII constants
 .DEFINE CBM_STOP 0x03
 .DEFINE CBM_RETURN 0x0D
@@ -20,7 +16,6 @@
 .DEFINE CBM_SPACE 0x20
 .DEFINE CBM_QUOTE 0x22
 .DEFINE CBM_COMMA 0x2C
-.DEFINE CBM_COLON 0x3A
 .DEFINE CBM_RUN 0x83
 
 
@@ -30,7 +25,6 @@
 ; C64 RAM equivalents
 ;
 
-.INCLUDE "basic.dasm16"
 .INCLUDE "keyboard.dasm16"
 .INCLUDE "screen.dasm16"
 
