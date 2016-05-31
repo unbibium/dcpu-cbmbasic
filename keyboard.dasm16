@@ -234,7 +234,6 @@
 ; KEYBOARD SCAN ROUTINE -- called every 1/60 of a second
 ;-----------------------------------------------------------
 :ROMEA87 
-    JSR DISPLAY_INPUT_BUFFER    
     SET [SHFLAG], [KEYSHIFT]
     SET [SFDX], 0x407F ; code for NO KEY PRESSED
         IFE [KEYASCII], 0
@@ -247,8 +246,6 @@
         JSR SCANCTRL
     IFE [KEYSHIFT], 0x05 ; CBM (shift+ctrl)
         JSR SCANCBM
-        JSR DISPLAY_KEY_DEBUG
-        ;JSR DISPLAY_LINK_TABLE
 :ROMEAE0
     SET Y, [SFDX] ; key being pressed
         SET A, Y   ; [SFDX] contains the actual value, not scan code
@@ -318,25 +315,3 @@
 :ROMEB47
             RTS
 
-:DISPLAY_INPUT_BUFFER
-    SET PUSH, X
-    SET PUSH, I
-    SET PUSH, J
-    SET I, [FREETOP]
-    SET J, DEBUGLNK-1
-:BUFLOOP
-    STI X, [I]
-    IFC X, 0xFF00
-        JMP BUF99
-    AND X, 0xFF
-    BOR X, 0xB300
-    JMP BUF88
-:BUF99
-    BOR X, 0x6E00
-:BUF88 SET [J], X
-    IFL J, DEBUGLNK+15
-    JMP BUFLOOP
-    SET J, POP
-    SET I, POP
-    SET X, POP
-RTS

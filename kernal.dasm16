@@ -244,60 +244,6 @@
             SET EX, POP
             RFI
 
-; I appropriated this to display another
-; chunk of memory in the status bar.
-:DISPLAY_LINK_TABLE
-        SET PUSH, I
-        SET PUSH, J
-        SET I, LDTB1
-        SET J, DEBUGLNK-1
-:LINKLOOP
-        STI X, [I]
-        SET [J], 0x192E
-        IFC X, DL_UNLINKED
-            SET [J], 0x1921
-        IFL I, LDTB1+HW_ROWS+3
-        JMP LINKLOOP
-        SET J, POP
-        SET I, POP
-        RTS
-
-:HEXTHING
-   .FILL 10 48
-   .FILL 6 -9
-:DISPLAY_KEY_DEBUG
-        ; debugging code to display some registers every frame
-        SET Y, [COUNT]  ; 
-        SET X, DEBUGKEY+9
-        SET PUSH, B
-:DBGLOOP
-    ; display Y register in hex in debugging line
-        SET B, Y
-        AND B, 0x0F
-        ADD B, [HEXTHING+B]
-        SET [X], B
-        BOR [X], 0xF000
-        DIV Y, 0x10
-        SUB X, 1
-        IFG X, DEBUGKEY+5
-           JMP DBGLOOP
-        ; another one
-        SUB X, 1
-        SET Y, [VARTAB]
-        ;SET [Y], 0x41
-:DBGLOOP2
-    ; display Y register in hex in debugging line
-        SET B, Y
-        AND B, 0x0F
-        ADD B, [HEXTHING+B]
-        SET [X], B
-        BOR [X], 0xF000
-        DIV Y, 0x10
-        SUB X, 1
-        IFG X, DEBUGKEY+0
-           JMP DBGLOOP2
-        SET B, POP
-
 :ROMEAE0 
 ;Decode the Keystroke and Place its ASCII Value in the Keyboard Buffer
 
